@@ -26,6 +26,7 @@
    ⑬ [개찰 연출]      : function playReveal
    ⑭ [조아의 분석]    : function explainBid
    ⑮ [회사 투자]      : const UPGRADES
+   ⑯ [튜토리얼]       : const COACH
 
   가격 출처: 2026년 10월 19일 나라장터 종합쇼핑몰 검색 결과(첫 페이지)를
   게임용으로 단순화한 값이에요. 2050년 미래 물건(R5)은 상상한 값이에요.
@@ -253,7 +254,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v1.7</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v1.8</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -386,7 +387,6 @@ const SLOTS = [
   { // 1라운드: 아이들이 쓰는 물건 → 품질·친환경
     rivals: ['fast', 'cheap', 'green'],
     w: { price: 1, quality: 2, speed: 0.5, eco: 2, track: 0.5, innov: 0 },
-    joaTail: ' 왼쪽 "심사 기준"과 "특별 조건"에 맞는 카드를 고르세요!',
     items: [
       { item: '학생용 책상 (높이조절)', who: ['햇살초등학교', '바다초등학교'], unit: '개', qty: [80, 100, 120], min: 47000, max: 78000,
         joa: '{이름}, 첫 입찰이에요! 아이들이 매일 쓰는 책상이라 품질과 친환경을 중요하게 봐요.', fact: '1개에 1만원만 아껴도 100개면 100만원이 남아요!', conds: ['eco', 'quality', null] },
@@ -658,9 +658,9 @@ function addClue(n) {
 function updateClueCount() { document.querySelectorAll('.clue-count').forEach(e => e.textContent = clues.size); }
 function refreshStart() { $('start-clues').textContent = clues.size; $('start-true').hidden = clues.size < 5; updateClueCount(); }
 function resetRecord() {
-  openModal(`<h2>기록 초기화</h2><p>모은 단서를 모두 지울까요?</p>
+  openModal(`<h2>기록 초기화</h2><p>모은 단서를 모두 지울까요? (튜토리얼도 다시 나와요)</p>
     <div class="modal-acts"><button class="btn ghost" onclick="closeModal()">취소</button>
-    <button class="btn red" onclick="clues=new Set();saveClues();closeModal();refreshStart()">지우기</button></div>`);
+    <button class="btn red" onclick="clues=new Set();saveClues();try{localStorage.removeItem('naraTut_boss');localStorage.removeItem('naraTut_officer')}catch(e){};closeModal();refreshStart()">지우기</button></div>`);
 }
 function showStory() {
   openModal(`<h2>📖 2050, 나라장터를 지켜라</h2>
@@ -818,27 +818,19 @@ function showProfile(mode, after) {
    pic: 보여줄 그림 (SPRITES 이름, 'me' = 내 캐릭터)
    ============================================================= */
 const STORY_COMMON = [
-  { who: 'narr', pic: 'office', text: '2050년. 대한민국에서 필요한 물건은 모두 "AI 나라장터"에서 사고팔아요.' },
-  { who: 'narr', pic: 'coin', text: '학교 책상, 소방관 방화복, 공원 벤치까지… 모두 국민이 낸 세금으로 사는 물건이에요.' },
-  { who: 'narr', pic: 'black', text: '그런데 요즘 이상한 일이 생겼어요. 가격이 몰래 부풀려지고, 회사들끼리 짜고 치는 일이 늘고 있어요.' },
-  { who: 'narr', pic: 'black', text: '그 뒤에는 정체를 알 수 없는 "블랙 컴퍼니"가 있다는 소문이 돌아요…' },
+  { who: 'narr', pic: 'office', text: '2050년, 나라에서 필요한 물건은 모두 "AI 나라장터"에서 사요.' },
+  { who: 'narr', pic: 'black', text: '그런데 몰래 가격을 부풀리는 "블랙 컴퍼니"가 나타났어요!' },
 ];
-const STORY = {
+const STORY = {      // 장면은 짧게! (엄마 피드백: 글이 많으면 읽기 싫어요)
   boss: [
     ...STORY_COMMON,
-    { who: 'me', pic: 'me', text: '드디어 내 회사를 차렸다! 나라장터에서 첫 계약을 따내 보자!' },
-    { who: 'joa', pic: 'ai', text: '안녕하세요, {이름}! 저는 조달청 AI 비서 "조아"예요. 회사들이 공정하게 경쟁하도록 돕고 있어요.' },
-    { who: 'joa', pic: 'ai', text: '입찰에서 이기려면 가격만 싸면 안 돼요. 물건마다 중요하게 보는 "심사 기준"에 맞춰야 해요.' },
-    { who: 'joa', pic: 'ai', text: '그리고… 가끔 반칙의 유혹이 올 거예요. 당장은 이득이어도, 그 선택이 엔딩을 바꿔요.' },
-    { who: 'me', pic: 'me', text: '좋아, 공정하게 경쟁해서 회사를 키워 보겠어!' },
+    { who: 'me', pic: 'me', text: '드디어 내 회사를 차렸다! 공정하게 계약을 따내 보자!' },
+    { who: 'joa', pic: 'ai', text: '저는 AI 비서 조아예요. {이름}, 같이 해봐요!' },
   ],
   officer: [
     ...STORY_COMMON,
-    { who: 'me', pic: 'me', text: '오늘부터 조달청 신입 주무관! 국민 세금을 한 푼도 허투루 쓰지 않겠어!' },
-    { who: 'joa', pic: 'ai', text: '반가워요, {이름}! 저는 AI 비서 "조아"예요. 실제 나라장터 가격과 비교해서 입찰서를 분석해 드릴게요.' },
-    { who: 'joa', pic: 'ai', text: '너무 싼 입찰서, 1원까지 똑같은 입찰서, 이상한 부탁… 모두 블랙 컴퍼니의 흔적일 수 있어요.' },
-    { who: 'joa', pic: 'ai', text: '단, 제 분석은 딱 3번만 쓸 수 있어요. 꼭 필요할 때 불러주세요!' },
-    { who: 'me', pic: 'me', text: '좋아, 수상한 입찰서를 찾아서 블랙 컴퍼니의 정체를 밝히겠어!' },
+    { who: 'me', pic: 'me', text: '나는 조달청 신입 주무관! 세금을 아껴 보자!' },
+    { who: 'joa', pic: 'ai', text: '저는 AI 비서 조아예요. 수상한 입찰서를 같이 찾아요!' },
   ],
 };
 function playStory(mode, after) {
@@ -922,14 +914,69 @@ function confirmQuit() {
     <button class="btn" onclick="closeModal();showScreen('start')">처음으로</button></div>`);
 }
 function newsIntro(R, n, after) {
-  // 1라운드 시작 전에는 게임 방법을 먼저 보여줘요
-  if (n === 1 && !G.howtoShown) { G.howtoShown = true; showHowTo(G.mode, () => newsIntro(R, n, after)); return; }
+  const hint = R.w && !R.emergency
+    ? `📌 중요: <b class="gold">${topCriteria(R.w)}</b>${R.cond ? ` &nbsp; ⚠️ <b class="bad">${CONDS[R.cond].label}</b>` : ''}`
+    : `🤖 ${R.joa}`;
   openModal(`<div class="news"><span class="live">LIVE</span>📺 ${R.news}</div>
     <h2>라운드 ${n}. ${R.item} ${R.qty.toLocaleString()}${R.unit}</h2>
-    <p>📋 요청 기관: <b>${R.who}</b></p>
-    <p>🤖 <span class="muted">조아:</span> ${R.joa}</p>
+    <p style="font-size:15px">${hint}</p>
     <div class="modal-acts"><button class="btn" id="intro-go">시작!</button></div>`);
-  $('intro-go').onclick = () => { closeModal(); after(); };
+  $('intro-go').onclick = () => {
+    closeModal();
+    if (n === 1 && !tutorialDone(G.mode)) runCoach(COACH[G.mode], () => { markTutorial(G.mode); after(); });
+    else after();
+  };
+}
+/* =============================================================
+   ⑯ [튜토리얼]  첫 라운드에 화면을 직접 가리키면서 짧게 알려줘요
+   ============================================================= */
+const COACH = {
+  boss: [
+    { el: '#b-req',      text: '📋 <b>요청서</b>예요. 뭘 사는지, <b class="gold">특별 조건</b>과 <b class="gold">심사 기준 ●●●</b>을 봐요.' },
+    { el: '#b-hand',     text: '🃏 <b>카드 2장</b>을 골라요. ●●●(아주 중요)에 맞는 카드가 좋아요!' },
+    { el: '.pricebox',   text: '💰 <b>가격</b>을 정해요. 싸면 이기기 쉽지만 남는 돈이 줄어요.' },
+    { el: '#b-submit',   text: '📨 다 됐으면 <b>입찰하기!</b> 궁금하면 언제든 ❓도움말을 눌러요.' },
+  ],
+  officer: [
+    { el: '#o-req',      text: '📋 <b>요청서</b>예요. 뭘 사는지, 실제 가격이 얼마인지 봐요.' },
+    { el: '#o-bids',     text: '📨 회사들이 낸 <b>입찰서</b>예요. 가격·품질·납기를 비교해요.' },
+    { el: '#o-analyze',  text: '🤖 헷갈리면 <b>조아에게 분석</b>! 게임 전체에서 3번만 쓸 수 있어요.' },
+    { el: '#o-bids .acts', text: '수상하면 🚨<b>신고</b>, 괜찮으면 ✅<b>계약</b>! 궁금하면 ❓도움말을 눌러요.' },
+  ],
+};
+function tutorialDone(mode) { try { return localStorage.getItem('naraTut_' + mode) === '1'; } catch (e) { return false; } }
+function markTutorial(mode) { try { localStorage.setItem('naraTut_' + mode, '1'); } catch (e) {} }
+function runCoach(steps, done) {
+  const game = $('game');
+  const scale = game.getBoundingClientRect().width / game.offsetWidth;
+  const ov = document.createElement('div');
+  ov.id = 'coach';
+  ov.style.cssText = 'position:absolute;inset:0;z-index:30';
+  game.appendChild(ov);
+  let i = 0;
+  const finish = () => { ov.remove(); done(); };
+  const show = () => {
+    const target = game.querySelector(steps[i].el);
+    if (!target) { i++; return i < steps.length ? show() : finish(); }
+    const g = game.getBoundingClientRect(), r = target.getBoundingClientRect();
+    const x = (r.left - g.left) / scale - 6, y = (r.top - g.top) / scale - 6, w = r.width / scale + 12, h = r.height / scale + 12;
+    const below = y + h + 120 < 540;                          // 말풍선을 아래에 둘지 위에 둘지
+    const bx = Math.max(10, Math.min(x, 960 - 380));
+    ov.innerHTML = `
+      <div style="position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:3px solid var(--gold);box-shadow:0 0 0 2000px #070816c4;pointer-events:none"></div>
+      <div class="box" style="position:absolute;left:${bx}px;${below ? `top:${y + h + 10}px` : `top:${Math.max(10, y - 110)}px`};width:370px;background:var(--panel);border-color:var(--gold);display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.5">
+        <div>${steps[i].text}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="muted" style="font-size:12px">${i + 1} / ${steps.length}</span>
+          <span style="display:flex;gap:6px"><button class="btn ghost sm" id="co-skip">건너뛰기</button>
+          <button class="btn sm" id="co-next">${i === steps.length - 1 ? '시작! ▶' : '다음 ▶'}</button></span>
+        </div>
+      </div>`;
+    $('co-next').onclick = () => { beep('click'); i++; i < steps.length ? show() : finish(); };
+    $('co-skip').onclick = finish;
+    $('co-next').focus();
+  };
+  show();
 }
 function reqBox(R) {
   const range = R.future ? `<b>2050 미래 사업</b> (실제 가격 없음)<br>예상 범위: ${unitPrice(R.min)} ~ ${unitPrice(R.max)}`
