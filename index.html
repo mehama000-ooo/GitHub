@@ -254,7 +254,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v1.8</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v1.9</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -306,7 +306,9 @@
       <span class="grow player-tag" id="o-title">🏛️ 조달청 담당자 모드</span>
       <button class="btn sm ghost" onclick="showHowTo('officer')">❓ 도움말</button>
       <span class="stat">라운드 <b id="o-round">1</b>/5</span>
+      <span class="stat" id="o-timer-box" hidden>⏱️ <b id="o-timer">30</b>초</span>
       <span class="stat">아낀 나랏돈 <b id="o-saved" class="num">0원</b></span>
+      <span class="stat" title="라운드마다 얼마나 알맞은 회사를 골랐는지 (평균)">⭐ <b id="o-judge">-</b></span>
       <span class="stat">🧩 <b class="clue-count">0</b>/5</span>
     </div>
     <div class="cols">
@@ -319,7 +321,7 @@
         <button class="btn officer" id="o-analyze" onclick="officerAnalyze()">🤖 조아에게 분석 맡기기</button>
       </div>
       <div class="col">
-        <div class="label">입찰서를 비교해서 알맞은 회사를 고르세요. 수상하면 🚨 신고!</div>
+        <div class="label">입찰서를 비교해서 가성비가 제일 좋은 회사와 ✅계약! 수상하면 📄서류를 보고 🚨신고!</div>
         <div class="bids" id="o-bids"></div>
       </div>
     </div>
@@ -475,51 +477,124 @@ function buildBossRounds() {
 let BOSS_ROUNDS = buildBossRounds();
 
 /* =============================================================
-   ⑤ [담당자 라운드]
-   bids: 입찰서 목록. flag 가 있으면 수상한 입찰서예요
-     low = 너무 쌈(불량)   collude = 담합   friend = 친구 부탁   black = 블랙 컴퍼니
+   ⑤ [담당자 라운드]  판마다 물건과 입찰서가 랜덤으로 만들어져요!
+   - 물건은 사장님 모드와 같은 SLOTS 에서 뽑아요 (실제 나라장터 가격)
+   - 입찰서 4장 중에 수상한 입찰서가 숨어 있어요 (없을 때도 있어요!)
+     low 덤핑 / inflate 부풀리기 / collude 담합 / fake 서류 위조 / friend 친구 부탁 / black 블랙 컴퍼니
    ============================================================= */
-const OFFICER_ROUNDS = [
-  { item: '소방용 특수방화복 (상의+하의)', who: '바다시 소방서', qty: 20, unit: '벌',
-    min: 684500, max: 1210000,
-    news: '바다시 소방서, 낡은 방화복 20벌 교체',
-    joa: '반가워요, {이름}! 첫 업무예요! 가격·품질·납기를 비교해서 고르세요. 제 분석은 5라운드 동안 3번만 쓸 수 있으니 아껴 쓰세요!',
-    bids: [ { co: 'slow', price: 1150000 }, { co: 'fast', price: 900000 }, { co: 'green', price: 980000 } ],
-    real: '상의+하의 한 벌에 약 68만~121만원, 20벌이면 약 1,369만~2,420만원이에요.' },
-  { item: '급식 식판', who: '꿈나무중학교', qty: 500, unit: '개',
-    min: 6800, max: 9800,
-    news: '꿈나무중학교 급식실 새 단장',
-    joa: '하나가 이상하게 싸네요… 싼 게 비지떡일 수도 있어요.',
-    bids: [ { co: 'fast', price: 9200 }, { co: 'green', price: 9600 }, { co: 'cheap', price: 3900, flag: 'low', quality: 1, clue: 1 }, { co: 'slow', price: 9700 } ],
-    real: '실제로는 약 340만~490만원이에요. 학생들이 매일 쓰는 물건이에요!' },
-  { item: '버스정류장 안내전광판', who: '하늘시 교통과', qty: 10, unit: '대',
-    min: 1067000, max: 3500000,
-    news: '하늘시, 버스정류장 전광판 10대 설치',
-    joa: '입찰서를 꼼꼼히 봐주세요. 뭔가 겹치는 게 있어요.',
-    bids: [ { co: 'slow', price: 2900000 }, { co: 'fast', price: 2150000, flag: 'collude', clue: 2 }, { co: 'cheap', price: 2150000, flag: 'collude', clue: 2 }, { co: 'green', price: 2400000 } ],
-    real: '실제로는 약 1,067만~3,500만원이에요. 담합하면 경쟁이 없어져서 가격이 올라가요.' },
-  { item: '보건용 마스크 (KF94)', who: '별빛보건소', qty: 10000, unit: '장',
-    min: 119, max: 280,
-    news: '독감 유행 대비… 보건소 마스크 1만 장 구매',
-    joa: '{이름}, 친구분한테서 전화가 왔어요.',
-    choice: 'friend',
-    bids: [ { co: 'fast', price: 190 }, { co: 'green', price: 230 }, { co: 'slow', price: 270 }, { co: 'friend', price: 350, flag: 'friend' } ],
-    real: '1장에 119~280원, 1만 장이면 약 119만~280만원이에요. 작은 차이가 모이면 커져요!' },
-  { item: '2050 AI 나라장터 서버', who: '조달청', qty: 1, unit: '식',
-    min: 300000000, max: 400000000, future: true,
-    news: '블랙 컴퍼니, AI 나라장터 서버 입찰에 최저가 제출',
-    joa: '{이름}, 블랙 컴퍼니 서류를 분석했어요. 대표자 칸이 비어 있고, 회사 주소가 가짜예요!',
-    choice: 'blackfinal',
-    bids: [ { co: 'black', price: 250000000, flag: 'black', clue: 5 }, { co: 'slow', price: 390000000 }, { co: 'fast', price: 340000000 }, { co: 'green', price: 370000000 } ],
-    real: '2050년 미래 사업이라 상상한 금액이에요. 가장 싼 곳이 아니라 믿을 수 있는 곳을 고르는 게 진짜 아끼는 거예요.' },
+const O_JOA = [
+  '{이름}, 첫 업무예요! 기관이 중요하게 보는 기준(●●●)에 맞는 회사를 고르세요.',
+  '이번엔 가격이 중요해요. 그런데 너무 싼 곳, 가격이 똑같은 곳은 조심해요!',
+  '납기가 급한 일이에요. 📄서류도 꼼꼼히 봐야 해요.',
+  '🚨 긴급 상황! 30초 안에 계약할 회사를 골라야 해요!',
+  '마지막 큰 사업이에요. 블랙 컴퍼니가 입찰했다는 소문이 있어요…',
 ];
+const O_SUSPECTS = [            // 라운드별로 숨길 수 있는 수상한 입찰서 (하나를 랜덤으로 골라요)
+  [[], ['low'], ['inflate']],
+  [['low'], ['collude'], ['low', 'inflate'], ['fake']],
+  [['fake'], ['collude'], ['fake', 'low'], []],
+  [['friend'], ['friend', 'low']],
+  [['black'], ['black', 'inflate'], ['black', 'collude']],
+];
+const CEO_NAMES = ['김하늘', '이도윤', '박서연', '최민준', '정지우', '강하은', '조은우', '윤서진', '장태양', '한별'];
+const ADDRS = ['하늘시 구름로 12', '바다시 파도길 7', '푸른시 숲속로 33', '별빛구 은하로 5', '미래시 내일로 88', '새싹구 봄길 21', '햇살시 아침로 9'];
+function rint(a, b) { return Math.floor(a + Math.random() * (b - a + 1)); }
+function phone() { return `0${rint(2, 6)}-${rint(200, 999)}-${rint(1000, 9999)}`; }
+function makeDoc(bid) {
+  return { ceo: pick(CEO_NAMES), founded: `${rint(2031, 2046)}년 ${rint(1, 12)}월`, addr: pick(ADDRS), tel: phone(),
+    records: rint(8, 60), certs: [bid.eco ? `🌿 친환경 인증 (번호 ECO-${rint(1000, 9999)})` : null, bid.innov ? `💡 혁신제품 지정 (번호 INV-${rint(1000, 9999)})` : null].filter(Boolean) };
+}
+function valueScore(b, R) {     // 기관 입장에서 본 "가성비 점수" (높을수록 좋은 선택)
+  const w = R.w, hi = R.budget || R.max, lo = R.min * 0.6;
+  const span = Math.max(hi - lo, 0.9 * R.base);
+  const ps = Math.max(0, Math.min(40, 40 * (hi - b.price) / span));
+  return Math.round(ps * w.price + (b.quality - 1) * 6 * w.quality + (b.speed - 1) * 3 * w.speed
+    + (b.eco ? 12 : 0) * w.eco + (b.track ? 10 : 0) * w.track + (b.innov ? 12 : 0) * w.innov);
+}
+function bidProblem(b, R) {     // 이 입찰서의 문제 (없으면 null)
+  if (b.flag) return b.flag;
+  if (b.price > (R.budget || R.max)) return 'over';
+  if (R.cond && CONDS[R.cond].test && !CONDS[R.cond].test(b)) return 'unqual';
+  return null;
+}
+function buildOfficerRounds() {
+  return [0, 1, 2, 3, 4].map(si => {
+    const sl = SLOTS[si], it = pick(sl.items);
+    const R = {
+      item: it.item, who: pick(it.who), unit: it.unit, qty: pick(it.qty), min: it.min, max: it.max,
+      base: Math.round(it.min + (it.max - it.min) * 0.42), emergency: !!sl.emergency, future: !!sl.future,
+      w: sl.w || { price: 1, quality: 1, speed: 2, eco: 0, track: 0.5, innov: 0 },   // 긴급 상황은 납기가 제일 중요
+      cond: it.conds && si !== 0 ? pick(it.conds) : null,
+      choice: si === 3 ? 'friend' : si === 4 ? 'blackfinal' : null,
+    };
+    R.budget = R.cond === 'budget' ? Math.max(Math.round(R.min * 1.1), Math.round(R.max * CONDS.budget.cut)) : R.max;
+    R.news = it.news || `${R.who}, ${R.item} ${R.qty.toLocaleString()}${R.unit} 구매 입찰 공고`;
+    R.joa = O_JOA[si] + (R.cond ? ' ' + CONDS[R.cond].joa : '');
+    R.real = R.future ? `2050년 미래 사업이라 상상한 금액이에요. 가장 싼 곳이 아니라 믿을 수 있는 곳을 고르는 게 진짜 아끼는 거예요.`
+      : (R.min === R.max ? `실제로는 1${R.unit}에 ${unitPrice(R.min)}, ${R.qty.toLocaleString()}${R.unit}이면 약 ${won(R.min * R.qty)}이에요. `
+                         : `${R.qty.toLocaleString()}${R.unit}이면 실제로는 약 ${won(R.min * R.qty)}~${won(R.max * R.qty)}이에요. `) + it.fact;
+    // --- 정상 입찰서 4장 ---
+    const hi = R.budget;
+    let bids = shuffle(['slow', 'fast', 'green', 'cheap']).map(k => {
+      const c = COMPANIES[k];
+      const b = { co: k, price: R.base * c.priceMul * rand(0.88, 1.05), quality: c.quality, speed: c.speed, eco: c.eco,
+        track: Math.random() < 0.5 ? 1 : 0, innov: R.future && Math.random() < 0.5 ? 1 : 0, costMul: 1 };
+      CARDS[pick(c.fav.filter(x => x !== 'cut'))].apply(b);         // 회사마다 강점 하나 더
+      b.price = roundPrice(Math.max(R.min * 0.75, Math.min(b.price, hi * rand(0.9, 0.99))));
+      b.doc = makeDoc(b);
+      return b;
+    });
+    if (si === 0) bids = bids.slice(0, 3);                            // 첫 라운드는 3장만
+    // --- 수상한 입찰서 숨기기 ---
+    const free = () => bids.filter(b => !b.flag);
+    pick(O_SUSPECTS[si]).forEach(type => {
+      if (type === 'low') {
+        const b = free().find(x => x.co === 'cheap') || pick(free());
+        Object.assign(b, { flag: 'low', price: roundPrice(R.min * rand(0.35, 0.5)), quality: Math.max(b.quality, 4) });
+      } else if (type === 'inflate') {
+        const b = pick(free());
+        Object.assign(b, { flag: 'inflate', price: roundPrice(R.max * rand(1.12, 1.3)), quality: 5, speed: 5, eco: 1, track: 1 });
+        b.doc = makeDoc(b);
+      } else if (type === 'collude') {
+        const two = shuffle(free()).slice(0, 2);
+        const same = roundPrice(Math.min(hi * 0.97, R.base * rand(1.0, 1.1)));
+        const tel = phone(), addr = pick(ADDRS);
+        two.forEach(b => { b.flag = 'collude'; b.price = same; b.doc.tel = tel; b.doc.addr = addr; });
+      } else if (type === 'fake') {
+        const b = pick(free());
+        Object.assign(b, { flag: 'fake', price: roundPrice(R.base * rand(0.85, 0.95)), quality: 5, track: 1 });
+        b.doc = makeDoc(b); b.doc.founded = '2050년 9월'; b.doc.records = rint(40, 70);   // 한 달 전에 생긴 회사가 실적 40건 이상?!
+      } else if (type === 'friend') {
+        const b = pick(free());
+        Object.assign(b, { co: 'friend', flag: 'friend', price: roundPrice(R.max * rand(1.3, 1.5)), quality: 3, speed: 3, eco: 0, track: 0, innov: 0 });
+        b.doc = makeDoc(b); b.doc.ceo = '박친구 (내 친구)';
+      } else if (type === 'black') {
+        const b = pick(free());
+        Object.assign(b, { co: 'black', flag: 'black', price: roundPrice(R.min * rand(0.6, 0.7)), quality: 5, speed: 5, eco: 1, track: 1, innov: 1 });
+        b.doc = { ceo: '', founded: '알 수 없음', addr: '확인되지 않는 주소', tel: '없는 번호', records: 99, certs: ['💡 혁신제품 지정 (번호 확인 불가)'] };
+      }
+    });
+    // --- 조건을 지키는 정상 입찰서가 꼭 하나는 있게 ---
+    const ok = bids.filter(b => !bidProblem(b, R));
+    if (!ok.length) {
+      const b = free()[0] || bids[0];
+      delete b.flag; b.price = roundPrice(Math.min(b.price, hi * 0.95));
+      const cd = R.cond && CONDS[R.cond];
+      if (cd && cd.card && !cd.test(b)) { CARDS[cd.card].apply(b); if (!cd.test(b)) b.quality = Math.max(b.quality, 4), b.speed = Math.max(b.speed, 4); }
+      b.doc = makeDoc(b);
+    }
+    R.bids = shuffle(bids);
+    return R;
+  });
+}
+let OFFICER_ROUNDS = buildOfficerRounds();
 
 /* =============================================================
    ⑥ [단서] 블랙 컴퍼니 단서 5개
    ============================================================= */
 const CLUES = {
-  1: '알뜰 상사 식판 공장 주소가 블랙 컴퍼니와 같다.',
-  2: '전광판 입찰서 두 장의 글씨체가 똑같다.',
+  1: '덤핑한 회사의 공장 주소가 블랙 컴퍼니와 같다.',
+  2: '가격을 똑같이 쓴 두 입찰서의 글씨체가 똑같다.',
   3: '블랙 컴퍼니가 보낸 쪽지: "다들 이렇게 해. 너만 손해야."',
   4: '태풍 때 몰래 가격을 올린 회사 명단에 여러 회사 이름이 있다.',
   5: '블랙 컴퍼니의 대표자 칸이 비어 있다.',
@@ -621,6 +696,7 @@ function beep(type) {
 function shakeAlert() { const g = $('game'); g.classList.remove('alert'); void g.offsetWidth; g.classList.add('alert'); beep('alert'); }
 
 function showScreen(id) {
+  if (id !== 'officer' && typeof stopTimer === 'function' && G) stopTimer();
   document.querySelectorAll('.screen').forEach(s => s.hidden = (s.id !== id));
   if (id === 'start') refreshStart();
 }
@@ -722,15 +798,18 @@ const HOWTO = {
   officer: `<h2>🏛️ 담당자 모드 게임 방법</h2>
     <p>당신은 조달청 신입 주무관! 국민 세금으로 <b class="gold">좋은 물건을 알맞은 가격에</b> 사요.</p>
     <table class="tbl" style="text-align:left">
-      <tr><td><b class="gold">1</b></td><td style="text-align:left">📋 <b>요청서</b>를 보고, 회사들이 낸 <b>입찰서</b>를 비교해요. (가격·품질·납기)</td></tr>
-      <tr><td><b class="gold">2</b></td><td style="text-align:left">🤖 헷갈리면 <b>조아에게 분석</b>을 맡겨요. 실제 가격과 비교해 줘요. <b class="gold">게임 전체 3번!</b></td></tr>
-      <tr><td><b class="gold">3</b></td><td style="text-align:left">🚨 수상한 입찰서는 <b>신고</b>해요. 맞히면 단서를 얻어요!</td></tr>
-      <tr><td><b class="gold">4</b></td><td style="text-align:left">✅ 알맞은 회사를 골라 <b>계약</b>해요. 예산보다 싸게 사면 <b>아낀 나랏돈</b>이 쌓여요.</td></tr>
+      <tr><td><b class="gold">1</b></td><td style="text-align:left">📋 <b>요청서</b>에서 물건, 실제 가격, ⚠️특별 조건, 📌심사 기준(●●●)을 봐요.</td></tr>
+      <tr><td><b class="gold">2</b></td><td style="text-align:left">📨 입찰서를 비교해서 <b>가성비가 제일 좋은 회사</b>를 찾아요. 제일 싼 곳이 정답은 아니에요!</td></tr>
+      <tr><td><b class="gold">3</b></td><td style="text-align:left">📄 <b>서류</b>를 열어 회사 정보를 확인해요. 수상한 단서는 직접 찾아야 해요.</td></tr>
+      <tr><td><b class="gold">4</b></td><td style="text-align:left">🤖 <b>조아</b>는 실제 가격과 비교해 줘요. <b class="gold">게임 전체 3번!</b></td></tr>
+      <tr><td><b class="gold">5</b></td><td style="text-align:left">🚨 반칙한 회사는 <b>신고</b>(단서 획득!), 제일 좋은 회사와 ✅<b>계약</b>. 억울한 신고는 감점이에요.</td></tr>
+      <tr><td><b class="gold">6</b></td><td style="text-align:left">⏱️ 재난 라운드는 <b>30초 안에</b> 골라야 해요!</td></tr>
     </table>
-    <div class="tip">🔍 <b>수상한 입찰서 찾는 법</b><br>
-    ① 실제 가격보다 <b>훨씬 싸다</b> → 불량품일 수 있어요<br>
-    ② 두 회사 가격이 <b>1원까지 똑같다</b> → 담합일 수 있어요<br>
-    ③ 서류가 이상하거나 <b>부탁</b>이 들어온다 → 공정하지 않아요</div>`,
+    <div class="tip">🔍 <b>수상한 입찰서 찾는 법</b> (없는 라운드도 있어요!)<br>
+    💸 실제 최저가보다 <b>훨씬 싸다</b> → 덤핑 &nbsp; 📈 좋아 보이는데 <b>예산보다 비싸다</b> → 부풀리기<br>
+    🤝 두 회사 가격이 <b>똑같다</b> → 서류의 연락처·주소 비교 &nbsp; 📄 <b>설립일</b>은 최근인데 실적이 많다 → 서류 위조<br>
+    🕶️ 대표자나 주소가 <b>이상하다</b> → 가짜 회사</div>
+    <p class="muted" style="font-size:12px">⭐ 판단 점수: 제일 좋은 회사를 고르면 100점! 엔딩은 판단 점수 평균과 정직함으로 정해져요.</p>`,
 };
 function showHowTo(mode, after) {
   const body = mode === 'all' ? HOWTO.boss + '<hr style="border-color:#0b0d22">' + HOWTO.officer : HOWTO[mode];
@@ -903,7 +982,9 @@ function startMode(mode) {
 }
 function beginMode(mode) {
   if (mode === 'boss') BOSS_ROUNDS = buildBossRounds();   // 판마다 물건과 조건이 새로 뽑혀요
-  G = { mode, round: 0, money: 10000000, saved: 0, honesty: 0, boughtCheap: false, colluded: false, docsFixed: false, picked: [], hand: [], reported: new Set(), analyzed: false, analyzeLeft: 3, upgrades: [], invested: 0, log: [] };   // analyzeLeft: 조아 분석 기회 (게임 전체)
+  if (mode === 'officer') OFFICER_ROUNDS = buildOfficerRounds();
+  if (G && G.timerId) clearInterval(G.timerId);
+  G = { mode, round: 0, money: 10000000, saved: 0, honesty: 0, boughtCheap: false, colluded: false, docsFixed: false, picked: [], hand: [], reported: new Set(), analyzed: false, analyzeLeft: 3, upgrades: [], invested: 0, judges: [], wrongReports: 0, timerId: null, log: [] };   // analyzeLeft: 조아 분석 기회 (게임 전체)
   showScreen(mode);
   paintPlayerTag(mode);
   mode === 'boss' ? bossRound() : officerRound();
@@ -939,9 +1020,10 @@ const COACH = {
   ],
   officer: [
     { el: '#o-req',      text: '📋 <b>요청서</b>예요. 뭘 사는지, 실제 가격이 얼마인지 봐요.' },
-    { el: '#o-bids',     text: '📨 회사들이 낸 <b>입찰서</b>예요. 가격·품질·납기를 비교해요.' },
-    { el: '#o-analyze',  text: '🤖 헷갈리면 <b>조아에게 분석</b>! 게임 전체에서 3번만 쓸 수 있어요.' },
-    { el: '#o-bids .acts', text: '수상하면 🚨<b>신고</b>, 괜찮으면 ✅<b>계약</b>! 궁금하면 ❓도움말을 눌러요.' },
+    { el: '#o-bids',     text: '📨 회사들이 낸 <b>입찰서</b>예요. ●●● 기준으로 <b>가성비가 제일 좋은 곳</b>을 찾아요.' },
+    { el: '#o-bids .doc-btn', text: '📄 <b>서류</b>를 보면 회사 정보가 나와요. 수상한 단서가 숨어 있을 수 있어요!' },
+    { el: '#o-analyze',  text: '🤖 <b>조아</b>는 실제 가격과 비교해 줘요. 게임 전체에서 3번만!' },
+    { el: '#o-bids .acts', text: '수상하면 🚨<b>신고</b>, 제일 좋은 곳은 ✅<b>계약</b>! 궁금하면 ❓도움말을 눌러요.' },
   ],
 };
 function tutorialDone(mode) { try { return localStorage.getItem('naraTut_' + mode) === '1'; } catch (e) { return false; } }
@@ -1524,30 +1606,57 @@ function bossSubmit() {
 /* =============================================================
    🏛️ 담당자 모드
    ============================================================= */
+const FLAG_INFO = {   // 수상한 입찰서 설명 (결과 화면에서 "이렇게 찾을 수 있었어요")
+  low:     { name: '💸 덤핑',       why: '실제 최저가보다 훨씬 싸요. 이렇게 싸면 품질이 엉망일 가능성이 커요.', how: '요청서의 "나라장터 실제 가격"과 비교해 보세요.' },
+  inflate: { name: '📈 부풀리기',   why: '좋아 보이지만 실제 최고가(예산)보다 비싸요. 세금을 더 내는 거예요.', how: '가격이 예산을 넘는지 꼭 확인하세요.' },
+  collude: { name: '🤝 담합',       why: '두 회사 가격이 1원까지 똑같고, 서류의 연락처·주소도 같아요. 몰래 짠 거예요.', how: '가격이 같은 입찰서끼리 📄서류를 비교해 보세요.' },
+  fake:    { name: '📄 서류 위조',  why: '한 달 전(2050년 9월)에 생긴 회사인데 납품 실적이 40건이 넘어요. 말이 안 돼요!', how: '📄서류의 설립일과 실적을 같이 보세요.' },
+  friend:  { name: '🤝 친구 부탁',  why: '친구 회사라도 실제 가격보다 훨씬 비싸요. 봐주면 세금이 새요.', how: '친구여도 똑같은 기준으로 비교해야 해요.' },
+  black:   { name: '🕶️ 블랙 컴퍼니', why: '대표자 칸이 비어 있고, 주소가 확인되지 않아요. 가짜 회사예요.', how: '📄서류의 대표자와 주소를 보세요.' },
+  over:    { name: '⛔ 예산 초과',  why: '예산보다 비싸서 계약할 수 없어요.', how: '' },
+  unqual:  { name: '⚠️ 조건 미달',  why: '기관의 특별 조건을 못 지켜요.', how: '' },
+};
+const FLAG_CLUE = { low: 1, collude: 2, black: 5 };
+function stopTimer() { if (G && G.timerId) { clearInterval(G.timerId); G.timerId = null; } if ($('o-timer-box')) $('o-timer-box').hidden = true; }
 function officerRound() {
   const R = OFFICER_ROUNDS[G.round];
-  G.reported = new Set(); G.analyzed = false; G.friendRefused = false;
+  G.reported = new Set(); G.wrongReports = 0; G.analyzed = false; G.roundOver = false;
+  stopTimer();
   $('o-round').textContent = G.round + 1;
   $('o-saved').textContent = won(G.saved);
-  $('o-req').innerHTML = reqBox(R) + `<p style="margin-top:6px" class="muted">예산: 1${R.unit}당 최대 ${unitPrice(R.max)}</p>`;
+  $('o-judge').textContent = G.judges.length ? Math.round(G.judges.reduce((a, b) => a + b, 0) / G.judges.length) : '-';
+  $('o-req').innerHTML = reqBox(R);
   joaSay('o', R.joa);
   $('o-analyze').disabled = G.analyzeLeft <= 0;
-  $('o-analyze').textContent = G.analyzeLeft > 0
-    ? `🤖 조아에게 분석 맡기기 (남은 기회 ${G.analyzeLeft}/3)`
-    : '🤖 분석 기회를 다 썼어요 (0/3)';
+  $('o-analyze').textContent = G.analyzeLeft > 0 ? `🤖 조아에게 가격 분석 맡기기 (남은 기회 ${G.analyzeLeft}/3)` : '🤖 분석 기회를 다 썼어요 (0/3)';
   renderOfficer();
+  const go = () => { if (R.emergency) startTimer(); };
   newsIntro(R, G.round + 1, () => {
-    if (R.choice === 'friend') officerFriend();
+    if (R.choice === 'friend') officerFriend(go);
     else if (R.choice === 'blackfinal') officerBlack();
+    else go();
   });
+}
+function startTimer() {                          // ⏱️ 긴급 라운드: 30초 안에 골라야 해요
+  G.timeLeft = 30;
+  $('o-timer-box').hidden = false; $('o-timer').textContent = G.timeLeft;
+  G.timerId = setInterval(() => {
+    if (!$('modal').hidden && !$('doc-view')) return;   // 📄서류를 보는 동안에는 시간이 흘러요! (다른 안내창에서는 잠깐 멈춰요)
+    G.timeLeft--;
+    $('o-timer').textContent = G.timeLeft;
+    if (G.timeLeft <= 10) $('o-timer-box').style.background = 'var(--bad)';
+    if (G.timeLeft <= 5) beep('click');
+    if (G.timeLeft <= 0) { stopTimer(); timeUp(); }
+  }, 1000);
 }
 function bidInfo(bd) {
   const c = COMPANIES[bd.co];
-  return { ...bd, name: c.name, emoji: c.emoji, tint: c.tint, quality: bd.quality ?? c.quality, speed: c.speed, eco: c.eco };
+  return { ...bd, name: c.name, emoji: c.emoji, tint: c.tint };
 }
 function renderOfficer() {
   const R = OFFICER_ROUNDS[G.round];
   $('o-bids').innerHTML = '';
+  const prices = R.bids.map(b => b.price);
   R.bids.forEach((bd, i) => {
     const b = bidInfo(bd);
     const el = document.createElement('div');
@@ -1557,92 +1666,166 @@ function renderOfficer() {
     head.insertAdjacentHTML('beforeend', `<span>${b.emoji} ${b.name}</span>`);
     el.appendChild(head);
     let ana = '';
-    if (G.analyzed) {
-      const r = R.future ? pctVsRange(b.price, R.min, R.max) : pctVsRange(b.price, R.min, R.max);
-      ana = `<span class="${r.cls}">📊 ${r.txt}</span>`;
-      if (bd.flag === 'collude') ana += ' <span class="bad">🚨 다른 회사와 가격이 똑같음!</span>';
-      if (bd.flag === 'black') ana += ' <span class="bad">🚨 서류 이상</span>';
+    if (G.analyzed) {                              // 조아는 "가격"만 분석해 줘요. 서류는 직접 봐야 해요!
+      const r = pctVsRange(b.price, R.min, R.max);
+      ana = b.price > R.budget ? '<span class="bad">📊 예산 초과!</span>' : `<span class="${r.cls}">📊 ${R.future ? '예상 범위 대비 ' : ''}${r.txt}</span>`;
+      if (prices.filter(p => p === b.price).length > 1) ana += ' <span class="bad">⚠️ 다른 회사와 가격이 똑같아요</span>';
+      if (R.cond && CONDS[R.cond].test) ana += CONDS[R.cond].test(b) ? ' <span class="good">조건 ✅</span>' : ' <span class="bad">조건 ❌</span>';
     }
     el.insertAdjacentHTML('beforeend', `
       <div class="row"><span>1${R.unit}당</span><b class="num">${unitPrice(b.price)}</b></div>
       <div class="row"><span>총액</span><b class="num">${won(b.price * R.qty)}</b></div>
-      <div class="row"><span>품질 ${stars(b.quality)}</span><span>납기 ${speedText(b.speed)} ${b.eco ? '🌿' : ''}</span></div>
+      <div class="row"><span>품질 ${stars(b.quality)}</span><span>납기 ${speedText(b.speed)}</span></div>
+      <div class="row"><span>인증·실적</span><span>${(b.eco ? '🌿' : '') + (b.track ? '📈' : '') + (b.innov ? '💡' : '') || '-'}</span></div>
       <div class="ana">${ana}</div>
       <div class="acts">
+        <button class="btn sm ghost doc-btn" onclick="officerDocs(${i})">📄 서류</button>
         <button class="btn sm red" ${G.reported.has(i) ? 'disabled' : ''} onclick="officerReport(${i})">🚨 신고</button>
-        <button class="btn sm green" ${G.reported.has(i) ? 'disabled' : ''} onclick="officerPick(${i})">✅ 이 회사로 계약</button>
+        <button class="btn sm green" ${G.reported.has(i) ? 'disabled' : ''} onclick="officerPick(${i})">✅ 계약</button>
       </div>`);
     $('o-bids').appendChild(el);
   });
 }
+/* 📄 서류 보기: 수상한 단서는 직접 찾아야 해요 */
+function officerDocs(i) {
+  const R = OFFICER_ROUNDS[G.round], b = bidInfo(R.bids[i]), d = b.doc;
+  beep('click');
+  openModal(`<div id="doc-view"></div><h2>📄 ${b.emoji} ${b.name} 제출 서류</h2>
+    <p class="muted" style="font-size:12px">📅 오늘 날짜: 2050년 10월 · 수상한 점이 있는지 꼼꼼히 보세요!</p>
+    <table class="tbl" style="text-align:left;font-size:14px">
+      <tr><th style="width:120px">대표자</th><td style="text-align:left">${d.ceo ? esc(d.ceo) : '&nbsp;'}</td></tr>
+      <tr><th>설립일</th><td style="text-align:left">${d.founded}</td></tr>
+      <tr><th>회사 주소</th><td style="text-align:left">${d.addr}</td></tr>
+      <tr><th>연락처</th><td style="text-align:left" class="num">${d.tel}</td></tr>
+      <tr><th>납품 실적</th><td style="text-align:left">${d.records}건</td></tr>
+      <tr><th>인증</th><td style="text-align:left">${d.certs.length ? d.certs.join('<br>') : '없음'}</td></tr>
+      <tr><th>입찰 가격</th><td style="text-align:left" class="num">1${R.unit}당 ${unitPrice(b.price)} (총 ${won(b.price * R.qty)})</td></tr>
+    </table>
+    <div class="modal-acts"><button class="btn" onclick="closeModal()">닫기</button></div>`);
+}
 function officerAnalyze() {
   if (G.analyzed || G.analyzeLeft <= 0) return;   // 라운드마다 1번, 게임 전체 3번
   G.analyzed = true; G.analyzeLeft--; $('o-analyze').disabled = true; beep('click');
-  $('o-analyze').textContent = `✓ 분석 완료 (남은 기회 ${G.analyzeLeft}/3)`;
-  const R = OFFICER_ROUNDS[G.round];
-  const flagged = R.bids.filter(b => b.flag);
-  joaSay('o', flagged.length
-    ? '분석 완료! {이름}, 나라장터 실제 가격과 비교해 봤어요. 빨간 글씨를 잘 보세요.'
-    : '분석 완료! {이름}, 수상한 입찰서는 없어요. 가격·품질·납기의 균형을 보세요.');
+  $('o-analyze').textContent = `✓ 가격 분석 완료 (남은 기회 ${G.analyzeLeft}/3)`;
+  joaSay('o', '가격 분석 완료! {이름}, 나라장터 실제 가격과 비교해 봤어요. 그런데 서류 문제는 저도 몰라요. 📄서류는 직접 확인해 주세요!');
   renderOfficer();
 }
 function officerReport(i) {
+  if (G.roundOver) return;
   const R = OFFICER_ROUNDS[G.round];
   const bd = R.bids[i];
-  if (!bd.flag) { beep('lose'); joaSay('o', `{이름}, ${josa(COMPANIES[bd.co].name, '은', '는')} 문제없는 회사예요. 신고는 신중하게!`); return; }
-  const sameGroup = bd.flag === 'collude' ? R.bids.map((b, j) => b.flag === 'collude' ? j : -1).filter(j => j >= 0) : [i];
-  sameGroup.forEach(j => G.reported.add(j));
+  if (!bd.flag) {
+    G.wrongReports++; beep('lose');
+    const prob = bidProblem(bd, R);
+    joaSay('o', prob ? `{이름}, ${josa(COMPANIES[bd.co].name, '은', '는')} ${FLAG_INFO[prob].name} 상태라 계약하면 안 되지만, 반칙한 건 아니에요. 신고는 반칙한 회사에만!`
+                     : `{이름}, ${josa(COMPANIES[bd.co].name, '은', '는')} 문제없는 회사예요. 억울한 신고는 판단 점수가 깎여요!`);
+    return;
+  }
+  const group = bd.flag === 'collude' ? R.bids.map((b, j) => b.flag === 'collude' ? j : -1).filter(j => j >= 0) : [i];
+  group.forEach(j => G.reported.add(j));
   G.honesty += 1; shakeAlert();
-  const msg = { low: '너무 싼 식판은 품질 미달이었어요!', collude: '두 회사가 몰래 가격을 맞춘 담합이었어요!', friend: '친구라도 비싼 가격을 봐줄 순 없어요.', black: '블랙 컴퍼니 서류가 가짜였어요!' }[bd.flag];
-  openModal(`<h2>🚨 신고 성공!</h2><p>🤖 조아: ${msg}</p>${addClue(bd.clue)}
+  const fi = FLAG_INFO[bd.flag];
+  openModal(`<h2>🚨 신고 성공! ${fi.name}</h2><p>🤖 조아: ${fi.why}</p>${addClue(FLAG_CLUE[bd.flag])}
     <div class="modal-acts"><button class="btn" onclick="closeModal();renderOfficer()">계속하기</button></div>`);
 }
-function officerFriend() {
+function officerFriend(after) {
+  const R = OFFICER_ROUNDS[G.round];
+  const fi = R.bids.findIndex(b => b.flag === 'friend');
+  const fb = R.bids[fi];
   openModal(`<h2>🤝 친구의 부탁</h2>
-    <p class="tip">"야, 우리 회사가 요즘 어려워서 그래. 이번 마스크 입찰 한 번만 우리 쪽으로 해줘. 가격이 좀 비싸긴 한데… 우리 사이잖아!"</p>
-    <p>🤖 조아: 친구네 상사 가격은 1장에 350원이에요. 나라장터 실제 최고가(280원)보다 비싸요.</p>
+    <p class="tip">"야, 우리 회사가 요즘 어려워서 그래. 이번 ${R.item} 입찰 한 번만 우리 쪽으로 해줘. 가격이 좀 비싸긴 한데… 우리 사이잖아!"</p>
+    <p>🤖 조아: 친구네 상사 가격은 1${R.unit}당 <b>${unitPrice(fb.price)}</b>이에요. 실제 최고가(${unitPrice(R.max)})보다 비싸요.</p>
     <div class="modal-acts">
       <button class="btn red" id="f-yes">😥 부탁 들어주기</button>
       <button class="btn green" id="f-no">🙅 정중하게 거절하기</button>
     </div>`);
-  $('f-yes').onclick = () => { closeModal(); G.honesty -= 2; officerPick(3, true); };
-  $('f-no').onclick = () => { G.honesty += 1; closeModal(); joaSay('o', '잘 하셨어요, {이름}! 공정한 기준으로 골라봐요!'); };
+  $('f-yes').onclick = () => { closeModal(); G.honesty -= 2; officerPick(fi, true); };
+  $('f-no').onclick = () => { G.honesty += 1; closeModal(); joaSay('o', '잘 하셨어요, {이름}! ⏱️ 30초 안에 공정하게 골라봐요!'); after(); };
 }
 function officerBlack() {
+  const R = OFFICER_ROUNDS[G.round];
+  const bi = R.bids.findIndex(b => b.flag === 'black');
   openModal(`<h2>🕶️ 블랙 컴퍼니의 최종 입찰</h2>
-    <p>블랙 컴퍼니가 다른 회사보다 <b class="gold">1억 원 가까이 싼</b> 가격을 냈어요. 그런데 조아가 서류에서 이상한 점을 찾았어요.</p>
-    <p class="tip">🤖 조아: "대표자 칸이 비어 있고, 회사 주소가 실제로 없는 곳이에요. 제 분석을 믿으시겠어요?"</p>
+    <p>블랙 컴퍼니가 <b class="gold">엄청나게 싼</b> 가격에 품질·납기·인증까지 모두 최고라고 써서 냈어요.</p>
+    <p class="tip">🤖 조아: "너무 좋아서 이상해요… {이름}, 📄서류를 꼭 직접 확인해 보세요!"</p>
     <div class="modal-acts">
-      <button class="btn ghost" id="bk-skip">🤷 그냥 넘어가기</button>
-      <button class="btn red" id="bk-report">🚨 조아를 믿고 신고하기</button>
+      <button class="btn" id="bk-ok">알겠어요</button>
     </div>`);
-  $('bk-report').onclick = () => { closeModal(); officerReport(0); };
-  $('bk-skip').onclick = () => { closeModal(); joaSay('o', '…알겠어요, {이름}. 그래도 블랙 컴퍼니는 조심하세요.'); };
+  $('bk-ok').onclick = () => { closeModal(); joaSay('o', '블랙 컴퍼니 📄서류를 확인하고, 수상하면 🚨신고해 주세요!'); };
+}
+function timeUp() {
+  if (G.roundOver) return;
+  const R = OFFICER_ROUNDS[G.round];
+  G.roundOver = true;
+  const loss = Math.round(R.budget * R.qty * 0.2);
+  G.saved -= loss; G.judges.push(0);
+  shakeAlert();
+  openModal(`<h2>⏰ 시간 초과!</h2>
+    <p>계약이 늦어져서 구호물품이 늦게 도착했어요. 급하게 다시 구하느라 <b class="bad">${won(loss)}</b>이 더 들었어요.</p>
+    <p>🤖 조아: 긴급 상황에서는 빨리 판단하는 것도 중요해요!</p>
+    <div class="modal-acts"><button class="btn" id="next-btn">다음 라운드 →</button></div>`);
+  $('next-btn').onclick = () => { closeModal(); G.round++; G.round < 5 ? officerRound() : finish(); };
 }
 function officerPick(i, forcedFriend) {
+  if (G.roundOver) return;
   const R = OFFICER_ROUNDS[G.round];
+  G.roundOver = true; stopTimer();
   const b = bidInfo(R.bids[i]);
-  let saved = (R.max - b.price) * R.qty;
-  let joa, bad = false;
-  switch (b.flag) {
-    case 'low': saved = -b.price * R.qty; G.boughtCheap = true; bad = true;
-      joa = '😰 식판이 한 달 만에 깨졌어요! 전부 다시 사야 해서 산 금액만큼 손해예요.'; break;
-    case 'collude': G.honesty -= 1; bad = true;
-      joa = '담합한 회사와 계약했어요. 경쟁이 있었다면 더 쌌을 거예요.'; break;
-    case 'friend': G.honesty -= forcedFriend ? 0 : 2; bad = true;
-      joa = '친구는 기뻐했지만, 세금으로 비싼 마스크를 샀어요.'; break;
-    case 'black': saved -= 300000000; G.honesty -= 3; bad = true;
-      joa = '🚨 블랙 컴퍼니가 돈만 받고 사라졌어요! 다시 계약하느라 3억 원을 더 썼어요.'; break;
+  const prob = bidProblem(R.bids[i], R);
+  const valid = R.bids.map((x, j) => ({ ...bidInfo(x), j, prob: bidProblem(x, R), val: valueScore(x, R) }));
+  const okBids = valid.filter(x => !x.prob).sort((a, c) => c.val - a.val);
+  const best = okBids[0];
+  let saved = (R.budget - b.price) * R.qty, judge = 0, joa, bad = true;
+  switch (prob) {
+    case 'low':     saved = -b.price * R.qty; G.boughtCheap = true; joa = `😰 ${R.item}이(가) 금방 망가졌어요! 전부 다시 사야 해서 산 금액만큼 손해예요.`; break;
+    case 'inflate': joa = '좋아 보였지만 예산보다 비싸게 샀어요. 세금이 더 들었어요.'; break;
+    case 'collude': G.honesty -= 1; judge = 10; joa = '담합한 회사와 계약했어요. 경쟁이 있었다면 더 쌌을 거예요.'; break;
+    case 'fake':    saved = -Math.round(b.price * R.qty * 0.5); joa = '😱 가짜 서류였어요! 회사가 선금만 받고 물건을 못 보냈어요.'; break;
+    case 'friend':  G.honesty -= forcedFriend ? 0 : 2; joa = '친구는 기뻐했지만, 세금으로 비싼 물건을 샀어요.'; break;
+    case 'black':   saved = -b.price * R.qty; G.honesty -= 3; joa = '🚨 블랙 컴퍼니가 돈만 받고 사라졌어요!'; break;
+    case 'over':    saved = 0; joa = '예산을 넘는 입찰서라 계약할 수 없어요. 다시 공고를 내야 해서 시간만 버렸어요.'; break;
+    case 'unqual':  saved = 0; joa = `기관의 특별 조건(${CONDS[R.cond].label})을 못 지키는 회사라 계약이 취소됐어요.`; break;
     default:
-      joa = b.quality >= 4 ? '👍 품질 좋은 회사를 적당한 가격에 골랐어요!' : b.price <= (R.min + R.max) / 2 ? '👍 알뜰하게 잘 골랐어요!' : '괜찮은 선택이에요.';
+      bad = false;
+      judge = Math.round(100 * Math.max(0, b.val ?? valueScore(R.bids[i], R)) / Math.max(1, best.val));
+      judge = Math.min(100, judge);
+      joa = best.j === i ? '🏅 최고의 선택이에요! 기관이 원하는 기준에 딱 맞는 회사를 골랐어요.' : '괜찮은 선택이에요. 그런데 더 좋은 회사가 있었어요. 아래 분석을 보세요!';
   }
+  // 신고 보너스와 억울한 신고 감점
+  const suspects = valid.filter(x => x.flag);
+  const caughtAll = suspects.length && suspects.every(x => G.reported.has(x.j));
+  if (!bad && caughtAll) judge = Math.min(100, judge + 10);
+  judge = Math.max(0, judge - G.wrongReports * 15);
+  G.judges.push(judge);
   G.saved += saved;
   $('o-saved').textContent = won(G.saved);
   bad ? shakeAlert() : beep('win');
-  openModal(`<h2>${bad ? '😰 아쉬운 계약' : '✅ 계약 완료!'}</h2>
+
+  // 🔍 조아의 분석
+  const stateOf = x => x.prob ? `<span class="bad">${FLAG_INFO[x.prob].name}</span>` : '<span class="good">✅ 정상</span>';
+  const tbl = `<table class="tbl num" style="font-size:12px">
+    <tr><th>회사</th><th>1${R.unit}당 가격</th><th>품질</th><th>납기</th><th>기타</th><th>상태</th><th>가성비 점수</th></tr>
+    ${valid.sort((a, c) => (a.prob ? 1 : 0) - (c.prob ? 1 : 0) || c.val - a.val).map(x => `<tr class="${x.j === i ? 'me' : ''} ${best && x.j === best.j ? 'win' : ''}">
+      <td>${x.emoji} ${x.name}${x.j === i ? ' ✍️' : ''}${best && x.j === best.j ? ' 👑' : ''}</td><td>${unitPrice(x.price)}</td><td>${stars(x.quality)}</td><td>${speedText(x.speed)}</td>
+      <td>${(x.eco ? '🌿' : '') + (x.track ? '📈' : '') + (x.innov ? '💡' : '') || '-'}</td><td>${stateOf(x)}</td><td><b>${x.prob ? '-' : x.val}</b></td></tr>`).join('')}
+  </table>`;
+  const why = (!bad && best.j !== i)
+    ? `<br>👑 <b>${best.emoji} ${best.name}</b>의 가성비 점수가 <b class="gold">${best.val}점</b>으로 제일 높았어요. 이번 기관은 <b class="gold">${topCriteria(R.w)}</b>을(를) 중요하게 봤거든요.` : '';
+  const missed = suspects.filter(x => !G.reported.has(x.j));
+  const missedTxt = missed.length
+    ? `<div class="tip" style="font-size:13px">🕵️ <b>놓친 수상한 입찰서</b><br>${[...new Map(missed.map(x => [x.flag, x])).values()].map(x => `• ${x.emoji} ${x.name}: <b class="bad">${FLAG_INFO[x.flag].name}</b> — ${FLAG_INFO[x.flag].why}<br>&nbsp;&nbsp;💡 ${FLAG_INFO[x.flag].how}`).join('<br>')}</div>`
+    : suspects.length ? '<div class="tip" style="font-size:13px">🕵️ 수상한 입찰서를 <b class="good">모두 찾아서 신고</b>했어요! (+10점)</div>'
+    : '<div class="tip" style="font-size:13px">🕵️ 이번 라운드에는 수상한 입찰서가 <b>없었어요.</b> 없는 걸 확인하는 것도 실력이에요!</div>';
+  const wrongTxt = G.wrongReports ? `<p class="bad" style="font-size:12px">⚠️ 억울한 신고 ${G.wrongReports}번 (-${G.wrongReports * 15}점)</p>` : '';
+
+  openModal(`<h2>${bad ? '😰 아쉬운 계약' : best.j === i ? '🏅 최고의 계약!' : '✅ 계약 완료!'}</h2>
     <p>${b.emoji} <b>${b.name}</b>${josa(b.name, '과', '와').slice(b.name.length)} 계약했어요. (1${R.unit}당 ${unitPrice(b.price)}, 총 ${won(b.price * R.qty)})</p>
-    <p>💰 아낀 나랏돈: <b class="${saved < 0 ? 'bad' : 'good'}">${saved >= 0 ? '+' : ''}${won(saved)}</b> <span class="muted">(예산 최대 ${won(R.max * R.qty)} 기준)</span></p>
-    <p>🤖 조아: ${joa}</p>
+    <p>💰 아낀 나랏돈: <b class="${saved < 0 ? 'bad' : 'good'}">${saved >= 0 ? '+' : ''}${won(saved)}</b> &nbsp;|&nbsp; ⭐ 판단 점수: <b class="gold">${judge}점</b></p>
+    <div class="box" style="display:flex;flex-direction:column;gap:6px">
+      <div style="font-size:15px">🔍 <b class="gold">조아의 분석</b> — ${joa}${prob ? `<br><span class="bad">${FLAG_INFO[prob].why}</span>` : ''}${why}</div>
+      ${tbl}
+    </div>
+    ${missedTxt}${wrongTxt}
     <div class="tip">💡 <b>실제 세상에서는?</b> ${R.real}</div>
     <div class="modal-acts"><button class="btn" id="next-btn">${G.round < 4 ? '다음 라운드 →' : '결과 보기 →'}</button></div>`);
   $('next-btn').onclick = () => { closeModal(); G.round++; G.round < 5 ? officerRound() : finish(); };
@@ -1655,7 +1838,7 @@ function finish() {
   const m = G.mode;
   let rich, honest, amount;
   if (m === 'boss') { amount = G.money - 10000000; rich = amount >= 50000000; honest = G.honesty >= 0; if (G.money <= 0) { rich = false; honest = false; } }
-  else { amount = G.saved; rich = amount >= 30000000; honest = G.honesty >= 0 && !G.boughtCheap; }
+  else { amount = G.saved; G.avgJudge = G.judges.length ? Math.round(G.judges.reduce((a, b) => a + b, 0) / G.judges.length) : 0; rich = G.avgJudge >= 70; honest = G.honesty >= 0 && !G.boughtCheap; }   // 담당자: 판단 점수 평균 70점 이상이면 좋은 엔딩
   const key = (rich ? 'rich' : 'poor') + (honest ? 'Honest' : 'Dishon');
   const E = ENDINGS[m][key];
   $('res-mode').textContent = (m === 'boss' ? '🏢 ' : '🏛️ ') + honorific() + '의 엔딩';
@@ -1664,6 +1847,7 @@ function finish() {
   const sp = $('res-sprite'); sp.dataset.sprite = E.sprite; paintSprite(sp);
   $('res-stats').innerHTML = `
     <span class="stat">${m === 'boss' ? '번 돈' : '아낀 나랏돈'} <b class="num">${won(amount)}</b></span>
+    ${m === 'officer' ? `<span class="stat">⭐ 판단 점수 평균 <b>${G.avgJudge}점</b></span>` : ''}
     <span class="stat">정직 점수 <b>${G.honesty >= 0 ? '⚖️ 높음' : '⚠️ 낮음'}</b></span>
     ${m === 'boss' ? `<span class="stat">🏭 시설 <b>${(G.upgrades || []).map(u => UPGRADES[u].icon).join('') || '없음'}</b></span>` : ''}
     <span class="stat">🧩 단서 <b>${clues.size}/5</b></span>`;
