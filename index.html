@@ -254,7 +254,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v1.9</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.0</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -504,12 +504,16 @@ function makeDoc(bid) {
   return { ceo: pick(CEO_NAMES), founded: `${rint(2031, 2046)}년 ${rint(1, 12)}월`, addr: pick(ADDRS), tel: phone(),
     records: rint(8, 60), certs: [bid.eco ? `🌿 친환경 인증 (번호 ECO-${rint(1000, 9999)})` : null, bid.innov ? `💡 혁신제품 지정 (번호 INV-${rint(1000, 9999)})` : null].filter(Boolean) };
 }
-function valueScore(b, R) {     // 기관 입장에서 본 "가성비 점수" (높을수록 좋은 선택)
+function valueParts(b, R) {     // 항목별 가성비 점수 (기관의 중요도 ●●● 를 곱한 값)
   const w = R.w, hi = R.budget || R.max, lo = R.min * 0.6;
   const span = Math.max(hi - lo, 0.9 * R.base);
   const ps = Math.max(0, Math.min(40, 40 * (hi - b.price) / span));
-  return Math.round(ps * w.price + (b.quality - 1) * 6 * w.quality + (b.speed - 1) * 3 * w.speed
-    + (b.eco ? 12 : 0) * w.eco + (b.track ? 10 : 0) * w.track + (b.innov ? 12 : 0) * w.innov);
+  return { price: ps * w.price, quality: (b.quality - 1) * 6 * w.quality, speed: (b.speed - 1) * 3 * w.speed,
+    eco: (b.eco ? 12 : 0) * w.eco, track: (b.track ? 10 : 0) * w.track, innov: (b.innov ? 12 : 0) * w.innov };
+}
+function valueScore(b, R) {     // 기관 입장에서 본 "가성비 점수" (높을수록 좋은 선택)
+  const v = valueParts(b, R);
+  return Math.round(v.price + v.quality + v.speed + v.eco + v.track + v.innov);
 }
 function bidProblem(b, R) {     // 이 입찰서의 문제 (없으면 null)
   if (b.flag) return b.flag;
@@ -540,6 +544,7 @@ function buildOfficerRounds() {
       const b = { co: k, price: R.base * c.priceMul * rand(0.88, 1.05), quality: c.quality, speed: c.speed, eco: c.eco,
         track: Math.random() < 0.5 ? 1 : 0, innov: R.future && Math.random() < 0.5 ? 1 : 0, costMul: 1 };
       CARDS[pick(c.fav.filter(x => x !== 'cut'))].apply(b);         // 회사마다 강점 하나 더
+      b.quality = Math.min(5, b.quality); b.speed = Math.min(5, b.speed);   // 품질·납기는 최대 5단계
       b.price = roundPrice(Math.max(R.min * 0.75, Math.min(b.price, hi * rand(0.9, 0.99))));
       b.doc = makeDoc(b);
       return b;
@@ -1777,7 +1782,7 @@ function officerPick(i, forcedFriend) {
   const best = okBids[0];
   let saved = (R.budget - b.price) * R.qty, judge = 0, joa, bad = true;
   switch (prob) {
-    case 'low':     saved = -b.price * R.qty; G.boughtCheap = true; joa = `😰 ${R.item}이(가) 금방 망가졌어요! 전부 다시 사야 해서 산 금액만큼 손해예요.`; break;
+    case 'low':     saved = -b.price * R.qty; G.boughtCheap = true; joa = `😰 ${josa(R.item, '이', '가')} 금방 망가졌어요! 전부 다시 사야 해서 산 금액만큼 손해예요.`; break;
     case 'inflate': joa = '좋아 보였지만 예산보다 비싸게 샀어요. 세금이 더 들었어요.'; break;
     case 'collude': G.honesty -= 1; judge = 10; joa = '담합한 회사와 계약했어요. 경쟁이 있었다면 더 쌌을 거예요.'; break;
     case 'fake':    saved = -Math.round(b.price * R.qty * 0.5); joa = '😱 가짜 서류였어요! 회사가 선금만 받고 물건을 못 보냈어요.'; break;
@@ -1801,17 +1806,63 @@ function officerPick(i, forcedFriend) {
   $('o-saved').textContent = won(G.saved);
   bad ? shakeAlert() : beep('win');
 
-  // 🔍 조아의 분석
+  // 🔍 조아의 분석 ------------------------------------------------
   const stateOf = x => x.prob ? `<span class="bad">${FLAG_INFO[x.prob].name}</span>` : '<span class="good">✅ 정상</span>';
-  const tbl = `<table class="tbl num" style="font-size:12px">
+  const fullTbl = `<table class="tbl num" style="font-size:12px">
     <tr><th>회사</th><th>1${R.unit}당 가격</th><th>품질</th><th>납기</th><th>기타</th><th>상태</th><th>가성비 점수</th></tr>
-    ${valid.sort((a, c) => (a.prob ? 1 : 0) - (c.prob ? 1 : 0) || c.val - a.val).map(x => `<tr class="${x.j === i ? 'me' : ''} ${best && x.j === best.j ? 'win' : ''}">
+    ${[...valid].sort((a, c) => (a.prob ? 1 : 0) - (c.prob ? 1 : 0) || c.val - a.val).map(x => `<tr class="${x.j === i ? 'me' : ''} ${best && x.j === best.j ? 'win' : ''}">
       <td>${x.emoji} ${x.name}${x.j === i ? ' ✍️' : ''}${best && x.j === best.j ? ' 👑' : ''}</td><td>${unitPrice(x.price)}</td><td>${stars(x.quality)}</td><td>${speedText(x.speed)}</td>
       <td>${(x.eco ? '🌿' : '') + (x.track ? '📈' : '') + (x.innov ? '💡' : '') || '-'}</td><td>${stateOf(x)}</td><td><b>${x.prob ? '-' : x.val}</b></td></tr>`).join('')}
   </table>`;
-  const why = (!bad && best.j !== i)
-    ? `<br>👑 <b>${best.emoji} ${best.name}</b>의 가성비 점수가 <b class="gold">${best.val}점</b>으로 제일 높았어요. 이번 기관은 <b class="gold">${topCriteria(R.w)}</b>을(를) 중요하게 봤거든요.` : '';
-  const missed = suspects.filter(x => !G.reported.has(x.j));
+  const me = valid.find(x => x.j === i);
+  const second = okBids[1];
+  // 두 회사를 항목별로 비교하는 표 + 쉬운 설명
+  const compare = (A, B, aLabel, bLabel) => {
+    const pa = valueParts(A, R), pb = valueParts(B, R);
+    const keys = ['price', 'quality', 'speed', 'eco', 'track', 'innov'].filter(k => R.w[k] > 0);   // 이번 기관이 안 보는 항목은 빼요
+    const rows = keys.map(k => ({ k, a: Math.round(pa[k]), b: Math.round(pb[k]) }));
+    const tbl = `<table class="tbl num" style="font-size:12px">
+      <tr><th>항목</th><th>이번 중요도</th><th>${aLabel}<br>${A.emoji} ${A.name}</th><th>${bLabel}<br>${B.emoji} ${B.name}</th><th>누가 앞섰나</th></tr>
+      ${rows.map(({ k, a, b: bb }) => `<tr><td>${ITEM_INFO[k].n}</td><td>${dots(R.w[k])}</td>
+        <td>${ITEM_INFO[k].show(A)}<br><span class="muted">${a}점</span></td><td>${ITEM_INFO[k].show(B)}<br><span class="muted">${bb}점</span></td>
+        <td class="${a > bb ? 'good' : a < bb ? 'bad' : 'muted'}">${a === bb ? '같아요' : (a > bb ? A.name : B.name) + ' +' + Math.abs(a - bb)}</td></tr>`).join('')}
+      <tr><td colspan="2"><b>가성비 점수 합계</b></td><td><b>${A.val}점</b></td><td><b>${B.val}점</b></td>
+        <td class="${A.val > B.val ? 'good' : A.val < B.val ? 'bad' : 'muted'}"><b>${A.val === B.val ? '같아요' : (A.val > B.val ? A.name : B.name) + ' +' + Math.abs(A.val - B.val)}</b></td></tr>
+    </table>`;
+    const winA = rows.filter(r => r.a > r.b).sort((x, y) => (y.a - y.b) - (x.a - x.b));
+    const winB = rows.filter(r => r.b > r.a).sort((x, y) => (y.b - y.a) - (x.b - x.a));
+    const say = (r, W, L) => {
+      const n = Math.abs(r.a - r.b), imp = R.w[r.k] >= 2 ? ' <span class="gold">(이번에 아주 중요한 항목 ●●●)</span>' : R.w[r.k] >= 1.5 ? ' <span class="gold">(중요한 항목 ●●)</span>' : '';
+      if (r.k === 'price') return `💸 <b>${W.name}</b>${josa(W.name, '이', '가').slice(W.name.length)} 1${R.unit}당 <b>${unitPrice(Math.abs(W.price - L.price))}</b> 더 싸서 <b>${n}점</b> 앞섰어요.${imp}`;
+      if (r.k === 'quality') return `🔧 <b>${W.name}</b>의 품질이 ${stars(W.quality)}로 더 좋아서 <b>${n}점</b> 앞섰어요.${imp}`;
+      if (r.k === 'speed') return `🚚 <b>${W.name}</b>의 납기가 '${speedText(W.speed)}'${josa(speedText(W.speed), '이라서', '라서').slice(speedText(W.speed).length)} <b>${n}점</b> 앞섰어요.${imp}`;
+      return `${ITEM_INFO[r.k].n}: <b>${W.name}</b>만 있어서 <b>${n}점</b> 앞섰어요.${imp}`;
+    };
+    const lines = [...winA.map(r => say(r, A, B)), ...winB.map(r => say(r, B, A))];
+    const sum = (list, X) => list.map(r => ITEM_INFO[r.k].n).join(', ');
+    const summary = winA.length && winB.length
+      ? `${josa(A.name, '은', '는')} <b>${sum(winA)}</b>에서 앞섰고, ${josa(B.name, '은', '는')} <b>${sum(winB)}</b>에서 앞섰어요. 둘을 더해 보니 <b>${A.val >= B.val ? A.name : B.name}</b>의 점수가 ${Math.abs(A.val - B.val)}점 더 높았어요.`
+      : `<b>${(winA.length ? A : B).name}</b>${josa((winA.length ? A : B).name, '이', '가').slice((winA.length ? A : B).name.length)} ${sum(winA.length ? winA : winB)}에서 앞서서 이겼어요.`;
+    return `${tbl}<div style="font-size:13px;line-height:1.6">${lines.map(l => '• ' + l).join('<br>')}<br>👉 ${summary}</div>`;
+  };
+  let head, body = '';
+  if (!bad && best.j === i) {
+    head = `🏅 <b>최고의 선택!</b> 정상 입찰서 중에 가성비 점수가 제일 높은 회사를 골랐어요.`;
+    if (second) body = `<div style="font-size:13px">📊 2등 <b>${second.emoji} ${second.name}</b>${josa(second.name, '과', '와').slice(second.name.length)} 비교해 볼까요?</div>` + compare(me, second, '✍️ 내가 고른 곳', '2등');
+  } else if (!bad) {
+    const gap = best.val - me.val;
+    head = gap <= 3
+      ? `👍 <b>거의 최고의 선택!</b> 1등 <b>${best.emoji} ${best.name}</b>${josa(best.name, '과', '와').slice(best.name.length)} 겨우 <b>${gap}점</b> 차이예요.`
+      : `🤔 <b>더 좋은 회사가 있었어요.</b> 1등 <b>${best.emoji} ${best.name}</b>보다 <b>${gap}점</b> 낮았어요.`;
+    body = `<div style="font-size:13px">📊 왜 <b>${best.name}</b>${josa(best.name, '이', '가').slice(best.name.length)} 1등이었을까요? 항목별로 비교해 봐요.</div>` + compare(me, best, '✍️ 내가 고른 곳', '👑 1등');
+  } else {
+    head = `${joa}<br><span class="bad">${FLAG_INFO[prob].why}</span>${FLAG_INFO[prob].how ? `<br>💡 ${FLAG_INFO[prob].how}` : ''}`;
+    if (best) body = `<div style="font-size:13px">👑 이번 라운드의 정답은 가성비 점수 <b class="gold">${best.val}점</b>인 <b>${best.emoji} ${best.name}</b>${josa(best.name, '이었어요', '였어요').slice(best.name.length)}.</div>`;
+  }
+  const judgeHow = !bad
+    ? `⭐ 판단 점수 = 내가 고른 곳 ${me.val}점 ÷ 1등 ${best.val}점 × 100${caughtAll ? ' + 신고 보너스 10' : ''}${G.wrongReports ? ` − 억울한 신고 ${G.wrongReports * 15}` : ''} = <b class="gold">${judge}점</b>`
+    : `⭐ 판단 점수: 문제 있는 회사와 계약해서 <b class="bad">${judge}점</b>`;
+  const missed = suspects.filter(x => !G.reported.has(x.j) && x.j !== i);   // 내가 계약한 곳은 위에서 이미 설명했어요
   const missedTxt = missed.length
     ? `<div class="tip" style="font-size:13px">🕵️ <b>놓친 수상한 입찰서</b><br>${[...new Map(missed.map(x => [x.flag, x])).values()].map(x => `• ${x.emoji} ${x.name}: <b class="bad">${FLAG_INFO[x.flag].name}</b> — ${FLAG_INFO[x.flag].why}<br>&nbsp;&nbsp;💡 ${FLAG_INFO[x.flag].how}`).join('<br>')}</div>`
     : suspects.length ? '<div class="tip" style="font-size:13px">🕵️ 수상한 입찰서를 <b class="good">모두 찾아서 신고</b>했어요! (+10점)</div>'
@@ -1820,12 +1871,15 @@ function officerPick(i, forcedFriend) {
 
   openModal(`<h2>${bad ? '😰 아쉬운 계약' : best.j === i ? '🏅 최고의 계약!' : '✅ 계약 완료!'}</h2>
     <p>${b.emoji} <b>${b.name}</b>${josa(b.name, '과', '와').slice(b.name.length)} 계약했어요. (1${R.unit}당 ${unitPrice(b.price)}, 총 ${won(b.price * R.qty)})</p>
-    <p>💰 아낀 나랏돈: <b class="${saved < 0 ? 'bad' : 'good'}">${saved >= 0 ? '+' : ''}${won(saved)}</b> &nbsp;|&nbsp; ⭐ 판단 점수: <b class="gold">${judge}점</b></p>
+    <p>💰 아낀 나랏돈: <b class="${saved < 0 ? 'bad' : 'good'}">${saved >= 0 ? '+' : ''}${won(saved)}</b> <span class="muted" style="font-size:12px">(예산 ${won(R.budget * R.qty)} − 계약 금액)</span></p>
+    <p style="font-size:13px">${judgeHow}</p>
     <div class="box" style="display:flex;flex-direction:column;gap:6px">
-      <div style="font-size:15px">🔍 <b class="gold">조아의 분석</b> — ${joa}${prob ? `<br><span class="bad">${FLAG_INFO[prob].why}</span>` : ''}${why}</div>
-      ${tbl}
+      <div style="font-size:15px">🔍 <b class="gold">조아의 분석</b> — ${head}</div>
+      ${body}
+      <p class="muted" style="font-size:11px;margin:0">💡 <b>가성비 점수란?</b> 가격·품질·납기·인증/실적에 점수를 매기고, 이번 기관의 중요도(●●●)만큼 곱해서 더한 점수예요. 그래서 제일 싼 곳이 꼭 1등은 아니에요!</p>
     </div>
     ${missedTxt}${wrongTxt}
+    <details><summary style="cursor:pointer;color:var(--muted);font-size:13px">📊 모든 입찰서 점수 보기</summary>${fullTbl}</details>
     <div class="tip">💡 <b>실제 세상에서는?</b> ${R.real}</div>
     <div class="modal-acts"><button class="btn" id="next-btn">${G.round < 4 ? '다음 라운드 →' : '결과 보기 →'}</button></div>`);
   $('next-btn').onclick = () => { closeModal(); G.round++; G.round < 5 ? officerRound() : finish(); };
