@@ -265,7 +265,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.7</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.8</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -394,7 +394,7 @@ const NORMAL_CARDS = ['quality', 'speed', 'eco', 'track', 'innov'];   // 플레�
           그 자리에 들어갈 물건 후보(items) 중 하나가 랜덤으로 뽑혀요.
    물건: min/max = 나라장터 종합쇼핑몰 실제 가격(2026년 10월, 1개당)
          qty = 수량 후보 / conds = 붙을 수 있는 특별 조건 (null = 조건 없음)
-   w: 심사 기준 가중치 (0 = 안 봄, 0.5 = 조금, 1 = 보통, 2 = 아주 중요)
+   w: 심사 기준 가중치 (0 = 안 봄, 0.5 = 조금, 1 = 보통, 2 = 아주 중요) — 물건에 w가 있으면 그 물건만의 기준을 써요
    ============================================================= */
 const SLOTS = [
   { // 1라운드: 아이들이 쓰는 물건 → 품질·친환경
@@ -404,9 +404,11 @@ const SLOTS = [
       { item: '학생용 책상 (높이조절)', who: ['햇살초등학교', '바다초등학교'], unit: '개', qty: [80, 100, 120], min: 47000, max: 78000,
         joa: '{이름}, 첫 입찰이에요! 아이들이 매일 쓰는 책상이라 품질과 친환경을 중요하게 봐요.', fact: '1개에 1만원만 아껴도 100개면 100만원이 남아요!', conds: ['eco', 'quality', null] },
       { item: '교실용 걸상 (의자)', who: ['별빛초등학교', '새싹초등학교'], unit: '개', qty: [150, 200, 250], min: 26000, max: 31000,
-        joa: '{이름}, 첫 입찰이에요! 아이들이 하루 종일 앉는 의자라 튼튼함(품질)과 친환경을 중요하게 봐요.', fact: '의자는 개수가 많아서 작은 가격 차이도 크게 쌓여요.', conds: ['quality', 'eco', null] },
+        w: { price: 1, quality: 2, speed: 0.5, eco: 0.5, track: 1.5, innov: 0 },
+        joa: '{이름}, 첫 입찰이에요! 아이들이 하루 종일 앉는 의자라 튼튼함(품질)이 제일 중요하고, 믿을 만한 회사인지(실적)도 봐요.', fact: '의자는 개수가 많아서 작은 가격 차이도 크게 쌓여요.', conds: ['quality', 'eco', null] },
       { item: '급식 식판', who: ['꿈나무중학교', '한빛중학교'], unit: '개', qty: [400, 500, 600], min: 6800, max: 9800,
-        joa: '{이름}, 첫 입찰이에요! 학생들이 매일 쓰는 식판이라 품질과 친환경(안전한 소재)을 중요하게 봐요.', fact: '식판은 매일 뜨거운 음식을 담아서, 싼 게 비지떡이면 금방 다시 사야 해요.', conds: ['eco', 'quality', null] },
+        w: { price: 1.5, quality: 1, speed: 0.5, eco: 2, track: 0.5, innov: 0 },
+        joa: '{이름}, 첫 입찰이에요! 학생들이 매일 쓰는 식판이라 안전한 소재(친환경)가 제일 중요하고, 많이 사야 해서 가격도 꽤 중요해요.', fact: '식판은 매일 뜨거운 음식을 담아서, 싼 게 비지떡이면 금방 다시 사야 해요.', conds: ['eco', 'quality', null] },
     ] },
   { // 2라운드: 가격 전쟁 + 블랙 컴퍼니 첫 등장
     rivals: ['green', 'fast', 'cheap', 'black'],
@@ -415,13 +417,17 @@ const SLOTS = [
     joaTail: ' 그런데 블랙 컴퍼니라는 회사가 처음 나타났어요…',
     items: [
       { item: '노트북컴퓨터', who: ['별빛구청', '하늘시청'], unit: '대', qty: [20, 30, 40], min: 1200000, max: 4100000,
-        joa: '구청은 예산을 아끼고 싶어해요. 이번엔 가격이 제일 중요한 가격 전쟁이에요!', fact: '같은 노트북도 성능에 따라 3배 넘게 차이 나요. 필요한 만큼만 사는 게 중요해요!', conds: ['budget', 'track', null] },
+        w: { price: 2, quality: 1.5, speed: 0.5, eco: 0, track: 1, innov: 0 },
+        joa: '구청은 예산을 아끼고 싶어해요. 가격이 제일 중요한 가격 전쟁! 그래도 오래 쓸 컴퓨터라 품질도 봐요.', fact: '같은 노트북도 성능에 따라 3배 넘게 차이 나요. 필요한 만큼만 사는 게 중요해요!', conds: ['budget', 'track', null] },
       { item: '태블릿컴퓨터', who: ['미래시 교육청', '바다시 교육청'], unit: '대', qty: [50, 80, 100], min: 168300, max: 1155000,
-        joa: '디지털 수업용 태블릿을 많이 사야 해서, 가격이 제일 중요한 가격 전쟁이에요!', fact: '태블릿은 168,300원부터 1,155,000원까지 7배 가까이 차이 나요.', conds: ['budget', 'track', null] },
+        w: { price: 2, quality: 0.5, speed: 1.5, eco: 0, track: 1, innov: 0 },
+        joa: '디지털 수업용 태블릿을 많이 사야 해서 가격이 제일 중요해요! 개학 전에 와야 해서 납기도 봐요.', fact: '태블릿은 168,300원부터 1,155,000원까지 7배 가까이 차이 나요.', conds: ['budget', 'track', null] },
       { item: '교실용 프로젝터 (4,700~5,500안시)', who: ['하늘시 구민회관', '별빛구 평생학습관'], unit: '대', qty: [10, 15, 20], min: 1320000, max: 3630000,
-        joa: '강의실마다 프로젝터를 바꿔야 해서 예산이 빠듯해요. 가격이 제일 중요해요!', fact: '밝기가 비슷해도 회사에 따라 2배 넘게 차이 나요.', conds: ['budget', 'quality', null] },
+        w: { price: 2, quality: 1, speed: 0.5, eco: 0, track: 1.5, innov: 0 },
+        joa: '강의실마다 프로젝터를 바꿔야 해서 예산이 빠듯해요. 가격이 제일 중요하고, 천장 설치를 해 본 회사(실적)인지도 봐요!', fact: '밝기가 비슷해도 회사에 따라 2배 넘게 차이 나요.', conds: ['budget', 'quality', null] },
       { item: '공기청정기', who: ['별빛구 육아종합지원센터', '하늘시 어린이집연합회'], unit: '대', qty: [30, 40], min: 388000, max: 1850000,
-        joa: '어린이집 여러 곳에 한꺼번에 들어가서 예산이 빠듯해요. 가격이 제일 중요한 가격 전쟁이에요!', fact: '공기청정기는 성능에 따라 가격이 4배 넘게 차이 나요.', conds: ['budget', 'quality', null] },
+        w: { price: 2, quality: 2, speed: 0.5, eco: 1, track: 0.5, innov: 0 },
+        joa: '어린이집 여러 곳에 한꺼번에 들어가서 가격이 중요해요! 그런데 아이들 건강과 관련돼서 품질도 똑같이 중요해요.', fact: '공기청정기는 성능에 따라 가격이 4배 넘게 차이 나요.', conds: ['budget', 'quality', null] },
     ] },
   { // 3라운드: 납기가 급해요 + 블랙 컴퍼니의 담합 제안
     rivals: ['slow', 'cheap', 'green'], choice: 'collude',
@@ -429,11 +435,14 @@ const SLOTS = [
     joaTail: ' 그런데 {이름}, 블랙 컴퍼니에서 쪽지가 왔어요.',
     items: [
       { item: '공원 벤치 (3인용)', who: ['푸른시 공원관리소'], unit: '개', qty: [40, 50, 60], min: 570000, max: 1770000,
-        joa: '공원 개장 날짜가 정해져 있어서 빠른 납품이 제일 중요해요.', fact: '같은 벤치도 디자인과 재료에 따라 3배나 차이 나요.', conds: ['eco', 'track', null] },
+        w: { price: 1, quality: 1, speed: 2, eco: 2, track: 0.5, innov: 0 },
+        joa: '공원 개장 날짜가 정해져 있어서 빠른 납품이 중요해요. 자연 속 공원이라 친환경도 똑같이 중요해요.', fact: '같은 벤치도 디자인과 재료에 따라 3배나 차이 나요.', conds: ['eco', 'track', null] },
       { item: '버스정류장 안내전광판', who: ['하늘시 교통과'], unit: '대', qty: [8, 10, 12], min: 1067000, max: 3500000,
-        joa: '새 버스 노선 개통일에 맞춰야 해서 빠른 납품이 제일 중요해요.', fact: '전광판은 화면 방식에 따라 3배 넘게 차이 나요.', conds: ['fast', 'track', null] },
+        w: { price: 1, quality: 1, speed: 2, eco: 0, track: 1.5, innov: 0 },
+        joa: '새 버스 노선 개통일에 맞춰야 해서 빠른 납품이 제일 중요해요. 길가에 설치해 본 회사(실적)인지도 봐요.', fact: '전광판은 화면 방식에 따라 3배 넘게 차이 나요.', conds: ['fast', 'track', null] },
       { item: '소화기 (3.3kg, ABC)', who: ['바다시 소방서', '별빛구 시설관리공단'], unit: '개', qty: [300, 500], min: 25000, max: 26500,
-        joa: '화재 안전 점검 날짜가 코앞이라 빠른 납품이 제일 중요하고, 생명과 관련돼서 품질도 중요해요.', fact: '소화기는 회사마다 가격이 거의 비슷해요. 이럴 땐 품질과 납기가 승부를 가려요!', conds: ['quality', 'fast', null] },
+        w: { price: 0.5, quality: 2, speed: 2, eco: 0, track: 1, innov: 0 },
+        joa: '화재 안전 점검 날짜가 코앞이라 빠른 납품이 제일 중요하고, 생명과 관련돼서 품질도 똑같이 중요해요.', fact: '소화기는 회사마다 가격이 거의 비슷해요. 이럴 땐 품질과 납기가 승부를 가려요!', conds: ['quality', 'fast', null] },
     ] },
   { // 4라운드: 재난 긴급 조달 (경쟁 없음, 바가지 유혹)
     rivals: [], emergency: true,
@@ -453,9 +462,11 @@ const SLOTS = [
       { item: '2050 스마트 도서관', who: ['미래시 교육청'], unit: '식', qty: [1], min: 400000000, max: 600000000,
         joa: '{이름}, 마지막 큰 계약! 미래 도서관이라 혁신제품을 제일 중요하게 보고, 큰 사업이라 실적도 봐요.', fact: '큰 계약일수록 정직이 더 중요해요!', conds: ['track', 'eco', null] },
       { item: '2050 AI 맞춤 교실 시스템', who: ['하늘시 교육청'], unit: '식', qty: [1], min: 300000000, max: 450000000,
-        joa: '{이름}, 마지막 큰 계약! AI 교실이라 혁신제품이 제일 중요하고, 학교 전체에 들어가서 실적도 봐요.', fact: 'AI 기술이 들어간 사업일수록 혁신제품 제도가 중요해요.', conds: ['track', 'eco', null] },
+        w: { price: 0.5, quality: 1.5, speed: 1, eco: 0.5, track: 1, innov: 2 },
+        joa: '{이름}, 마지막 큰 계약! AI 교실이라 혁신제품이 제일 중요하고, 학생들이 매일 쓰니까 품질도 중요해요.', fact: 'AI 기술이 들어간 사업일수록 혁신제품 제도가 중요해요.', conds: ['track', 'eco', null] },
       { item: '2050 수소 버스 충전소', who: ['푸른시 환경과'], unit: '식', qty: [1], min: 600000000, max: 900000000,
-        joa: '{이름}, 마지막 큰 계약! 미래 에너지 시설이라 혁신제품이 제일 중요하고, 안전한 큰 공사라 실적도 봐요.', fact: '친환경 에너지 시설은 미래 조달에서 점점 중요해지고 있어요.', conds: ['eco', 'track', null] },
+        w: { price: 0.5, quality: 1, speed: 0.5, eco: 2, track: 1.5, innov: 2 },
+        joa: '{이름}, 마지막 큰 계약! 미래 에너지 시설이라 혁신제품과 친환경이 똑같이 제일 중요하고, 큰 공사라 실적도 봐요.', fact: '친환경 에너지 시설은 미래 조달에서 점점 중요해지고 있어요.', conds: ['eco', 'track', null] },
     ] },
 ];
 /* 특별 조건: 못 지키면 점수와 상관없이 "자격 미달"로 탈락해요 (경쟁 회사도 똑같아요) */
@@ -473,7 +484,7 @@ function buildBossRounds() {
     const R = {
       item: it.item, who: pick(it.who), unit: it.unit, qty: pick(it.qty), min: it.min, max: it.max,
       base: Math.round(it.min + (it.max - it.min) * 0.42),          // 게임 기준가 (원가 계산용)
-      rivals: sl.rivals, w: sl.w, emergency: !!sl.emergency, future: !!sl.future, choice: sl.choice,
+      rivals: sl.rivals, w: it.w || sl.w, emergency: !!sl.emergency, future: !!sl.future, choice: sl.choice,
       cond: it.conds ? pick(it.conds) : null,
     };
     R.budget = R.cond === 'budget' ? Math.max(Math.round(R.min * 1.1), Math.round(R.max * CONDS.budget.cut)) : R.max;
@@ -538,7 +549,7 @@ function buildOfficerRounds() {
     const R = {
       item: it.item, who: pick(it.who), unit: it.unit, qty: pick(it.qty), min: it.min, max: it.max,
       base: Math.round(it.min + (it.max - it.min) * 0.42), emergency: !!sl.emergency, future: !!sl.future,
-      w: sl.w || { price: 1, quality: 1, speed: 2, eco: 0, track: 0.5, innov: 0 },   // 긴급 상황은 납기가 제일 중요
+      w: it.w || sl.w || { price: 1, quality: 1, speed: 2, eco: 0, track: 0.5, innov: 0 },   // 긴급 상황은 납기가 제일 중요
       cond: it.conds && si !== 0 ? pick(it.conds) : null,
       choice: si === 3 ? 'friend' : si === 4 ? 'blackfinal' : null,
     };
@@ -1015,7 +1026,7 @@ function confirmQuit() {
 }
 function newsIntro(R, n, after) {
   const hint = R.w && !R.emergency
-    ? `📌 중요: <b class="gold">${topCriteria(R.w)}</b>${R.cond ? ` &nbsp; ⚠️ <b class="bad">${CONDS[R.cond].label}</b>` : ''}`
+    ? `📌 제일 중요: <b class="gold">${topCriteria(R.w)}</b>${secondCriteria(R.w) ? ` · 그다음: <b>${secondCriteria(R.w)}</b>` : ''}${R.cond ? ` &nbsp; ⚠️ <b class="bad">${CONDS[R.cond].label}</b>` : ''}`
     : `🤖 ${R.joa}`;
   openModal(`<div class="news"><span class="live">LIVE</span>📺 ${R.news}</div>
     <h2>라운드 ${n}. ${R.item} ${R.qty.toLocaleString()}${R.unit}</h2>
@@ -1765,7 +1776,7 @@ function playDefect(area, end) {
     el.style.left = it.x + 'px';
     el.onclick = () => {
       if (it.done) return; it.done = true;
-      if (isBad) { caught++; speed = Math.min(2.2, speed + 0.3); beep('clue'); el.innerHTML = '✅'; } else { wrong++; beep('lose'); el.innerHTML = '❌'; }
+      if (isBad) { caught++; speed = [1, 1.6, 1.9, 2.15, 2.35, 2.5][caught]; beep('clue'); el.innerHTML = '✅'; } else { wrong++; beep('lose'); el.innerHTML = '❌'; }
       el.style.transition = 'opacity .3s'; el.style.opacity = '0'; hud();
     };
     area.appendChild(el); items.push(it);
@@ -1796,7 +1807,7 @@ function showShop(after) {
     openModal(`<h2>🏭 회사 투자 시간</h2>
       <p style="font-size:13px">{이름}, 번 돈으로 회사를 키워요! <b class="gold">이번 투자 시간에는 딱 1개만</b> 고를 수 있어요. 🎮 투자하면 <b class="gold">미니게임</b>이 나와요. 잘하면 최대 30% 할인! 산 시설은 <b class="gold">남은 라운드 내내</b> 효과가 있지만, 쓴 돈은 엔딩의 "번 돈"에서 빠져요. (자금이 100만원 아래로 내려가는 투자는 못 해요)</p>
       <div class="tip" style="font-size:13px;display:flex;justify-content:space-between;gap:10px;padding:6px 10px">
-        <span>📋 다음: <b>${R.item}</b>${R.emergency ? ' — 🚨 긴급 계약' : ' — 중요: <b class="gold">' + topCriteria(R.w) + '</b>'}${R.cond ? ' · <b class="bad">' + CONDS[R.cond].label + '</b>' : ''}</span>
+        <span>📋 다음: <b>${R.item}</b>${R.emergency ? ' — 🚨 긴급 계약' : ' — 중요: <b class="gold">' + topCriteria(R.w) + '</b>' + (secondCriteria(R.w) ? ' · ' + secondCriteria(R.w) : '')}${R.cond ? ' · <b class="bad">' + CONDS[R.cond].label + '</b>' : ''}</span>
         <span style="white-space:nowrap">💰 <b class="gold num">${won(G.money)}</b></span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
@@ -1824,6 +1835,11 @@ function showShop(after) {
     $('shop-go').focus({ preventScroll: true });
   };
   draw();
+}
+function secondCriteria(w) {          // 그다음으로 중요한 기준 (●● 이상만)
+  const max = Math.max(...CRITERIA.map(([k]) => w[k]));
+  const rest = CRITERIA.filter(([k]) => w[k] < max && w[k] >= 1.5);
+  return rest.map(([, n]) => n).join(', ');
 }
 function topCriteria(w) {
   const max = Math.max(...CRITERIA.map(([k]) => w[k]));
