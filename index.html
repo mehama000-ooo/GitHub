@@ -265,7 +265,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.5</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.6</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -1563,7 +1563,7 @@ const MINIS = {
     fact: '나라장터에서 납품한 기록은 다음 입찰 때 <b>납품 실적</b>으로 쓸 수 있어요. 꾸준한 실적이 신뢰가 돼요.', play: playMemory },
   lab:     { title: '🧪 신기술 물약 실험', how: '물약 4개 중 <b class="gold">3개를 맞는 순서</b>로 넣어요. 힌트를 보고 5번 안에 맞혀요!',
     fact: '조달청은 새로운 기술 제품을 <b>혁신제품</b>으로 지정해서 공공기관이 먼저 써 볼 수 있게 해요.', play: playPotion },
-  robot:   { title: '⚙️ 불량품 골라내기', how: '벨트 위로 물건이 지나가요. <b class="bad">기울어지고 금 간 불량품</b>만 클릭! 좋은 물건을 누르면 감점!',
+  robot:   { title: '⚙️ 불량품 골라내기', how: '벨트 위로 물건이 지나가요. <b class="bad">기울어지고 금 간 불량품</b>만 클릭! 좋은 물건을 누르면 감점! ⚡ 잡을수록 벨트가 빨라져요!',
     fact: '불량품을 미리 걸러내면 다시 만드는 비용이 줄어서 <b>원가</b>가 낮아져요.', play: playDefect },
 };
 function runMini(k, done) {
@@ -1748,9 +1748,9 @@ function playPotion(area, end) {
 function playDefect(area, end) {
   const goods = ['🪑', '📦', '🧸', '⚽', '🖥️'];
   const total = 14, badIdx = new Set(shuffle([...Array(total).keys()]).slice(0, 5));
-  let spawned = 0, caught = 0, missed = 0, wrong = 0, gone = 0;
+  let spawned = 0, caught = 0, missed = 0, wrong = 0, gone = 0, speed = 1;   // 불량품을 잡을수록 벨트가 빨라져요!
   area.innerHTML = `<div style="position:absolute;left:0;right:0;top:90px;height:90px;background:repeating-linear-gradient(90deg,#3a3a4a 0 30px,#2a2a3a 30px 60px);border-top:4px solid var(--line);border-bottom:4px solid var(--line)"></div>`;
-  const hud = () => mgHud(`잡은 불량품 <b class="good">${caught}/5</b> · 놓침 <b class="bad">${missed}</b> · 잘못 누름 <b class="bad">${wrong}</b>`);
+  const hud = () => mgHud(`잡은 불량품 <b class="good">${caught}/5</b> · 놓침 <b class="bad">${missed}</b> · 잘못 누름 <b class="bad">${wrong}</b> · ⚡ 벨트 속도 <b class="${speed > 1.5 ? 'bad' : 'gold'}">×${speed.toFixed(1)}</b>`);
   hud();
   const finish = () => end(caught === 5 && wrong === 0 ? 3 : caught - wrong >= 3 ? 2 : 1);
   const spawn = () => {
@@ -1758,22 +1758,24 @@ function playDefect(area, end) {
     const isBad = badIdx.has(spawned++);
     const el = document.createElement('button');
     el.className = 'btn ghost';
-    el.style.cssText = `position:absolute;top:98px;left:-80px;width:74px;height:74px;font-size:40px;padding:0;transition:left 4.2s linear;${isBad ? 'transform:rotate(28deg);filter:sepia(1) saturate(3) hue-rotate(-30deg);' : ''}`;
+    const dur = 4.2 / speed;                         // 지금 속도로 벨트를 지나가는 시간(초)
+    el.style.cssText = `position:absolute;top:98px;left:-80px;width:74px;height:74px;font-size:40px;padding:0;transition:left ${dur}s linear;${isBad ? 'transform:rotate(28deg);filter:sepia(1) saturate(3) hue-rotate(-30deg);' : ''}`;
     el.innerHTML = pick(goods) + (isBad ? '<span style="position:absolute;right:2px;top:0;font-size:22px">💥</span>' : '');
     area.appendChild(el);
     requestAnimationFrame(() => requestAnimationFrame(() => { el.style.left = (area.clientWidth + 10) + 'px'; }));
     el.onclick = () => {
       if (el.dataset.done) return; el.dataset.done = '1';
-      if (isBad) { caught++; beep('clue'); el.innerHTML = '✅'; } else { wrong++; beep('lose'); el.innerHTML = '❌'; }
+      if (isBad) { caught++; speed = Math.min(2.2, speed + 0.3); beep('clue'); el.innerHTML = '✅'; } else { wrong++; beep('lose'); el.innerHTML = '❌'; }
       el.style.transition = 'opacity .3s'; el.style.opacity = '0'; hud();
     };
     mgLater(() => {
       if (!el.dataset.done && isBad) { missed++; hud(); }
       el.remove(); gone++;
       if (gone >= total) finish();
-    }, 4300);
+    }, dur * 1000 + 100);
+    if (spawned < total) mgLater(spawn, 750 / speed);   // 다음 물건도 더 빨리 나와요
   };
-  spawn(); mgEvery(spawn, 750);
+  spawn();
 }
 
 function showShop(after) {
