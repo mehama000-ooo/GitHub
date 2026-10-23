@@ -265,7 +265,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.6</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.7</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -1744,38 +1744,49 @@ function playPotion(area, end) {
   };
 }
 
-/* ⚙️ 자동화: 불량품 골라내기 */
+/* ⚙️ 자동화: 불량품 골라내기 (벨트 위 모든 물건이 같은 속도로 움직여요. 잡을수록 다 같이 빨라져요!) */
 function playDefect(area, end) {
   const goods = ['🪑', '📦', '🧸', '⚽', '🖥️'];
   const total = 14, badIdx = new Set(shuffle([...Array(total).keys()]).slice(0, 5));
-  let spawned = 0, caught = 0, missed = 0, wrong = 0, gone = 0, speed = 1;   // 불량품을 잡을수록 벨트가 빨라져요!
+  let spawned = 0, caught = 0, missed = 0, wrong = 0, speed = 1, wait = 0, last = null, over = false;
+  const items = [];
+  const W = area.clientWidth, PX = (W + 90) / 4200;   // 속도 1일 때 4.2초 만에 벨트를 지나가요 (1ms에 PX픽셀)
   area.innerHTML = `<div style="position:absolute;left:0;right:0;top:90px;height:90px;background:repeating-linear-gradient(90deg,#3a3a4a 0 30px,#2a2a3a 30px 60px);border-top:4px solid var(--line);border-bottom:4px solid var(--line)"></div>`;
   const hud = () => mgHud(`잡은 불량품 <b class="good">${caught}/5</b> · 놓침 <b class="bad">${missed}</b> · 잘못 누름 <b class="bad">${wrong}</b> · ⚡ 벨트 속도 <b class="${speed > 1.5 ? 'bad' : 'gold'}">×${speed.toFixed(1)}</b>`);
   hud();
-  const finish = () => end(caught === 5 && wrong === 0 ? 3 : caught - wrong >= 3 ? 2 : 1);
+  const finish = () => { if (over) return; over = true; end(caught === 5 && wrong === 0 ? 3 : caught - wrong >= 3 ? 2 : 1); };
   const spawn = () => {
-    if (spawned >= total) return;
     const isBad = badIdx.has(spawned++);
     const el = document.createElement('button');
     el.className = 'btn ghost';
-    const dur = 4.2 / speed;                         // 지금 속도로 벨트를 지나가는 시간(초)
-    el.style.cssText = `position:absolute;top:98px;left:-80px;width:74px;height:74px;font-size:40px;padding:0;transition:left ${dur}s linear;${isBad ? 'transform:rotate(28deg);filter:sepia(1) saturate(3) hue-rotate(-30deg);' : ''}`;
+    el.style.cssText = `position:absolute;top:98px;left:0;width:74px;height:74px;font-size:40px;padding:0;${isBad ? 'transform:rotate(28deg);filter:sepia(1) saturate(3) hue-rotate(-30deg);' : ''}`;
     el.innerHTML = pick(goods) + (isBad ? '<span style="position:absolute;right:2px;top:0;font-size:22px">💥</span>' : '');
-    area.appendChild(el);
-    requestAnimationFrame(() => requestAnimationFrame(() => { el.style.left = (area.clientWidth + 10) + 'px'; }));
+    const it = { el, x: -80, isBad, done: false };
+    el.style.left = it.x + 'px';
     el.onclick = () => {
-      if (el.dataset.done) return; el.dataset.done = '1';
+      if (it.done) return; it.done = true;
       if (isBad) { caught++; speed = Math.min(2.2, speed + 0.3); beep('clue'); el.innerHTML = '✅'; } else { wrong++; beep('lose'); el.innerHTML = '❌'; }
       el.style.transition = 'opacity .3s'; el.style.opacity = '0'; hud();
     };
-    mgLater(() => {
-      if (!el.dataset.done && isBad) { missed++; hud(); }
-      el.remove(); gone++;
-      if (gone >= total) finish();
-    }, dur * 1000 + 100);
-    if (spawned < total) mgLater(spawn, 750 / speed);   // 다음 물건도 더 빨리 나와요
+    area.appendChild(el); items.push(it);
   };
-  spawn();
+  const tick = now => {
+    if (over || !MG) return;
+    const dt = last === null ? 16 : Math.min(50, now - last); last = now;
+    wait -= dt * speed;                                  // 다음 물건도 빨라진 만큼 더 빨리 나와요
+    if (spawned < total && wait <= 0) { spawn(); wait = 750; }
+    for (let i = items.length - 1; i >= 0; i--) {        // 모든 물건을 지금 속도로 한꺼번에 움직여요
+      const it = items[i];
+      it.x += dt * PX * speed; it.el.style.left = it.x + 'px';
+      if (it.x > W + 10) {
+        if (!it.done && it.isBad) { missed++; hud(); }
+        it.el.remove(); items.splice(i, 1);
+      }
+    }
+    if (spawned >= total && !items.length) return finish();
+    MG.raf = requestAnimationFrame(tick);
+  };
+  MG.raf = requestAnimationFrame(tick);
 }
 
 function showShop(after) {
