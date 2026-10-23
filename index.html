@@ -265,7 +265,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.3</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.4</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -1418,15 +1418,17 @@ function explainBid(rows, R, win, caught) {
   const me = rows.find(r => r.k === 'me');
   const rivals = rows.filter(r => r.k !== 'me');
   const you = esc(honorific());
-  if (caught) return `<div class="tip">🔍 <b>조아의 분석</b><br>점수로는 이겼지만, 서류를 고친 게 들통나서 계약이 취소됐어요. 반칙은 점수보다 무서워요!</div>`;
-  if (me.over) return `<div class="tip">🔍 <b>조아의 분석</b><br>⛔ ${you}, 예산(1${R.unit}당 <b class="gold">${unitPrice(R.budget)}</b>)보다 비싸게 써서 <b>점수를 받기도 전에 탈락</b>했어요. 실제 조달에서도 예산을 넘는 입찰서는 낙찰받을 수 없어요. 다음엔 초록색 구역 안으로 써 보세요!</div>`;
+  if (caught) return { short: '🚨 점수로는 이겼지만, 서류를 고친 게 들통나서 계약이 취소됐어요. 반칙은 점수보다 무서워요!', detail: '' };
+  if (me.over) return { short: `⛔ 예산(1${R.unit}당 <b class="gold">${unitPrice(R.budget)}</b>)보다 비싸게 써서 <b>점수를 받기도 전에 탈락</b>했어요.<br>💡 다음엔 가격 막대의 <b>초록색 구역</b> 안으로 써 보세요!`,
+    detail: '<p style="font-size:12px;margin:0">실제 조달에서도 예산을 넘는 입찰서는 낙찰받을 수 없어요.</p>' };
   if (me.unqual) {
     const cd = CONDS[R.cond];
-    return `<div class="tip">🔍 <b>조아의 분석</b><br>⚠️ ${you}, 이번 특별 조건 <b class="gold">${cd.label}</b>을 못 지켜서 <b>자격 미달</b>로 탈락했어요. 점수가 아무리 높아도 조건을 못 지키면 심사를 못 받아요.<br>💡 ${CARDS[cd.card].em} <b>${CARDS[cd.card].name}</b> 카드를 고르거나, 회사 투자로 시설을 갖추면 돼요!</div>`;
+    return { short: `⚠️ 특별 조건 <b class="gold">${cd.label}</b>을 못 지켜서 <b>자격 미달</b>로 탈락했어요.<br>💡 ${CARDS[cd.card].em} <b>${CARDS[cd.card].name}</b> 카드를 고르거나, 회사 투자로 시설을 갖추면 돼요!`,
+      detail: '<p style="font-size:12px;margin:0">점수가 아무리 높아도 조건을 못 지키면 심사를 못 받아요.</p>' };
   }
-  if (rows[0].score <= -999) return `<div class="tip">🔍 <b>조아의 분석</b><br>🚫 모든 입찰서가 탈락해서 <b>유찰</b>됐어요. (유찰 = 낙찰자가 없어서 입찰이 무효가 되는 것)</div>`;
+  if (rows[0].score <= -999) return { short: '🚫 모든 입찰서가 탈락해서 <b>유찰</b>됐어요. (유찰 = 낙찰자가 없어서 입찰이 무효가 되는 것)', detail: '' };
   const other = win ? rivals.filter(r => r.score > -999).sort(rankBids)[0] : rows[0];
-  if (!other) return '';
+  if (!other) return { short: '🏆 경쟁할 회사가 없었어요!', detail: '' };
   const c = COMPANIES[other.k] || {};
   const mi = me.parts.items, oi = other.parts.items;
   const keys = ['price', 'quality', 'speed', 'eco', 'track', 'innov'];
@@ -1504,16 +1506,22 @@ function explainBid(rows, R, win, caught) {
       ? `💡 2등과 <b>${gap}점</b> 차이였어요. 가격을 <b class="gold">${unitPrice(best.price)}</b>까지 올려도 이겼을 거예요. (이익 <b class="good">+${won(best.profit - me.profit)}</b> 더!)`
       : `💡 2등과 <b>${gap}점</b> 차이로 아슬아슬하게 이겼어요! 가격을 더 올렸으면 졌을 거예요. 딱 좋은 가격이었어요.`);
   }
-  const head = win
-    ? `🎉 ${josa(you, '이', '가')} <b>${other.emoji} ${other.name}</b>(2등)보다 <b class="good">${gap}점</b> 높았어요!`
-    : `😢 1등 <b>${other.emoji} ${other.name}</b>보다 <b class="bad">${-gap}점</b> 낮았어요.`;
-  return `<div class="box" style="display:flex;flex-direction:column;gap:6px">
-    <div style="font-size:15px">🔍 <b class="gold">조아의 분석</b> — ${head}</div>
-    ${tbl}
-    <div style="font-size:13px;line-height:1.6">${reasons.map(r => '• ' + r).join('<br>')}</div>
-    <div class="tip" style="line-height:1.6">${tips.join('<br>')}</div>
-    <p class="muted" style="font-size:11px;margin:0">※ 경쟁 회사가 쓰는 카드와 가격은 매번 조금씩 달라요. 같은 선택이어도 결과가 바뀔 수 있어요.</p>
-  </div>`;
+  // ✂️ 짧은 이유 한 줄: 이겼으면 가장 크게 앞선 항목, 졌으면 가장 크게 진 항목
+  const imp = k => R.w[k] >= 2 ? ' <span class="gold">(아주 중요 ●●●)</span>' : R.w[k] >= 1.5 ? ' <span class="gold">(중요 ●●)</span>' : '';
+  const key = diffs.filter(x => win ? x.d > 0 : x.d < 0).sort((a, b) => Math.abs(b.d) - Math.abs(a.d))[0];
+  const back = diffs.filter(x => win ? x.d < 0 : x.d > 0).sort((a, b) => Math.abs(b.d) - Math.abs(a.d))[0];
+  let short = win
+    ? `🏆 이긴 이유: ${key ? `<b>${ITEM_INFO[key.k].n}</b>${imp(key.k)}에서 <b class="good">+${key.d}점</b>` : '여러 항목에서 조금씩 앞섰어요'}`
+      + (back ? `<br><span class="muted">${other.name}${josa(other.name, '은', '는').slice(other.name.length)} ${ITEM_INFO[back.k].n}에서 앞섰지만 따라오지 못했어요.</span>` : '')
+    : `👑 1등 <b>${other.name}</b>${josa(other.name, '이', '가').slice(other.name.length)} 더 좋았던 점: ${key ? `<b>${ITEM_INFO[key.k].n}</b>${imp(key.k)} <b class="bad">+${-key.d}점</b>` : '여러 항목에서 조금씩'}`
+      + (back ? `<br><span class="muted">우리는 ${ITEM_INFO[back.k].n}에서 앞섰지만 모자랐어요.</span>` : '');
+  if (me.score === other.score) short = '⚖️ 점수가 똑같아서 <b>가격이 더 싼 회사</b>가 이겼어요.';
+  if (tips[0]) short += '<br>' + tips[0];
+  const detail = `${tbl}
+    <div style="font-size:12px;line-height:1.6">${reasons.map(r => '• ' + r).join('<br>')}</div>
+    ${tips.length > 1 ? `<div style="font-size:12px;line-height:1.6">${tips.slice(1).join('<br>')}</div>` : ''}
+    <p class="muted" style="font-size:11px;margin:0">※ 경쟁 회사가 쓰는 카드와 가격은 매번 조금씩 달라요. 같은 선택이어도 결과가 바뀔 수 있어요.</p>`;
+  return { short, detail };
 }
 /* =============================================================
    ⑮ [회사 투자]  라운드 사이에 번 돈으로 시설을 사요 (한 번 사면 계속 효과!)
@@ -1603,19 +1611,46 @@ function bossSubmit() {
   else if (R.emergency) joa = me.tempt ? '…피해 주민들이 비싼 값을 냈어요. 이익은 늘었지만 마음이 무거워요.' : '👍 정직한 가격으로 구호물품을 보냈어요. 주민들이 고마워해요!';
   else if (win) joa = me.profit < 0 ? '낙찰은 됐지만 너무 싸게 팔아서 손해를 봤어요. 싸다고 다 좋은 게 아니에요!' : `🎉 {이름}, 낙찰! 이번 심사 기준(${topCriteria(R.w)})에 잘 맞췄어요.`;
   else joa = (rows.some(r => r.k === 'black' && r.dumping) ? '블랙 컴퍼니는 덤핑 의심으로 감점됐지만, ' : '')
-    + `{이름}, 아쉽게 떨어졌어요. 위의 분석을 보고 다음 라운드에 다시 도전해 봐요!`;
+    + `{이름}, 아쉽게 떨어졌어요. 아래 이유를 보고 다음 라운드에 다시 도전해 봐요!`;
 
   if (R.emergency && !me.tempt) extra += addClue(4);
   const showResult = () => {
   if (caught || (win && R.emergency && me.tempt)) shakeAlert(); else beep(win ? 'win' : 'lose');
 
+  const ex = R.emergency ? { short: '', detail: '' } : explainBid(rows, R, win, caught);
+  // 📊 모든 회사 순위 막대 (탈락한 회사는 맨 아래 ❌)
+  const okRows = rows.filter(r => r.score > -999), mx = Math.max(1, ...okRows.map(r => r.score));
+  let rk = 0;
+  const rankBars = R.emergency ? '' : rows.map(r => {
+    const mine = r.k === 'me', top = r.k === winner, out = r.over || r.unqual || r.score <= -999;
+    const nm = mine ? '🚀 우리 회사' : `${r.emoji} ${r.name}`;
+    const bar = out ? `<div style="flex:1;font-size:12px;color:var(--muted)">${r.over ? '예산보다 비싸서 탈락' : '특별 조건 못 지켜서 탈락'}</div>`
+      : `<div style="flex:1;height:14px;background:var(--panel2);border:2px solid var(--line)"><div style="width:${Math.round(100 * Math.max(0, r.score) / mx)}%;height:100%;background:${mine ? 'var(--gold)' : top ? 'var(--good)' : 'var(--muted)'}"></div></div>`;
+    return `<div style="display:flex;align-items:center;gap:8px;font-size:13px;${mine ? 'font-weight:bold;color:var(--gold)' : ''}">
+      <span style="width:34px">${out ? '❌' : ++rk + '등'}</span>
+      <span style="width:160px;white-space:nowrap">${nm}${top ? ' 👑' : ''}${r.dumping ? ' <span class="bad" style="font-size:11px">⚠️덤핑</span>' : ''}</span>
+      ${bar}<b style="width:44px;text-align:right">${out ? '' : r.score + '점'}</b></div>`;
+  }).join('');
+  const chip = t => `<span class="stat" style="font-size:13px">${t}</span>`;
   openModal(`<h2>${caught ? '🚨 들통!' : win ? '🎉 낙찰 성공!' : '😢 탈락'}</h2>
-    ${R.emergency ? '' : explainBid(rows, R, win, caught)}
-    ${R.emergency ? '' : `<details><summary style="cursor:pointer;color:var(--muted);font-size:13px">📊 전체 회사 점수표 보기</summary>${table}</details>`}
-    <p>💰 이번 라운드: <b class="${change < 0 ? 'bad' : 'good'}">${change >= 0 ? '+' : ''}${won(change)}</b> &nbsp;|&nbsp; 회사 자금: <b class="gold">${won(G.money)}</b></p>
-    <p>🤖 조아: ${joa}</p>
-    <div class="tip">💡 <b>실제 세상에서는?</b> ${R.real}</div>
+    <p style="font-size:15px;margin:0 0 8px">🤖 ${joa}</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      ${chip(`💰 이번 라운드 <b class="${change < 0 ? 'bad' : 'good'}">${change >= 0 ? '+' : ''}${won(change)}</b>`)}
+      ${chip(`🏦 회사 자금 <b class="gold">${won(G.money)}</b>`)}
+      ${R.emergency || meScore.total <= -999 ? '' : chip(`⭐ 우리 점수 <b class="gold">${meScore.total}점</b>`)}
+    </div>
+    ${R.emergency ? '' : `<div class="box" style="display:flex;flex-direction:column;gap:6px">
+      ${rankBars}
+      <div style="font-size:14px;line-height:1.55">${ex.short}</div>
+    </div>`}
     ${extra}
+    <details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:13px">📊 자세히 보기 (항목별 점수 · 사용 카드 · 실제 세상 이야기)</summary>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+        ${ex.detail}
+        ${table}
+        <div class="tip" style="font-size:12px">💡 <b>실제 세상에서는?</b> ${R.real}</div>
+      </div>
+    </details>
     <div class="modal-acts"><button class="btn" id="next-btn">${G.round < 4 ? '다음 라운드 →' : '결과 보기 →'}</button></div>`);
   $('next-btn').onclick = () => { closeModal(); G.round++; if (G.money <= 0) G.round = 5; G.round < 5 ? showShop(bossRound) : finish(); };
   };
