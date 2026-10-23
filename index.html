@@ -265,7 +265,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.4</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.5</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -1536,12 +1536,252 @@ const UPGRADES = {
   robot:   { icon: '⚙️', name: '자동화 기계',   ds: '원가가 항상 10% 싸져요 (이익 ↑)',        cost: 3000000, apply: b => { b.costMul -= 0.1; } },
 };
 function coveredCards() { return (G && G.upgrades || []).map(u => UPGRADES[u].card).filter(Boolean); }
+/* =============================================================
+   🎮 [투자 미니게임]  시설을 살 때 짧은 미니게임! 별(⭐)이 많을수록 투자비 할인
+   ⭐⭐⭐ = 30% 할인, ⭐⭐ = 15% 할인, ⭐ = 할인 없음 (못해도 시설은 꼭 사져요)
+   ============================================================= */
+const MINI_DISCOUNT = [0, 0, 0.15, 0.3];
+let MG = null;                                    // 지금 하는 미니게임 (타이머 정리용)
+function mgClean() {
+  if (!MG) return;
+  MG.timers.forEach(t => { clearTimeout(t); clearInterval(t); });
+  if (MG.raf) cancelAnimationFrame(MG.raf);
+  if (MG.key) document.removeEventListener('keydown', MG.key);
+  MG = null;
+}
+function mgLater(fn, ms) { const t = setTimeout(fn, ms); MG && MG.timers.push(t); return t; }
+function mgEvery(fn, ms) { const t = setInterval(fn, ms); MG && MG.timers.push(t); return t; }
+function mgHud(txt) { const h = $('mg-hud'); if (h) h.innerHTML = txt; }
+const MINIS = {
+  factory: { title: '🔧 부품 조립', how: '움직이는 바늘이 <b class="gold">금색 칸</b>에 왔을 때 <b>조립!</b> 버튼(또는 스페이스바)을 눌러요. 3번 도전!',
+    fact: '나라에 납품하는 물건은 납품할 때 <b>검사</b>를 받아요. 조립이 정확해야 품질 검사를 통과해요.', play: playTiming },
+  truck:   { title: '🚚 배송 순서 기억', how: '배송지가 <b class="gold">순서대로 반짝</b>여요. 끝나면 같은 순서로 눌러요. 3번 도전!',
+    fact: '약속한 날짜보다 늦게 납품하면 <b>지체상금</b>이라는 돈을 물어야 해요. 배송 순서가 중요해요!', play: playSequence },
+  ecoLine: { title: '♻️ 분리수거', how: '나오는 쓰레기를 <b class="gold">맞는 통</b>에 넣어요. 15초 안에 10개!',
+    fact: '분리배출은 종이·플라스틱·캔·유리를 나눠요. 공공기관은 법에 따라 <b>친환경(녹색) 제품</b>을 우선 사야 해요.', play: playRecycle },
+  prTeam:  { title: '📣 홍보 포스터 짝 맞추기', how: '카드를 두 장씩 뒤집어서 <b class="gold">같은 그림</b>을 찾아요. 적게 뒤집을수록 좋아요!',
+    fact: '나라장터에서 납품한 기록은 다음 입찰 때 <b>납품 실적</b>으로 쓸 수 있어요. 꾸준한 실적이 신뢰가 돼요.', play: playMemory },
+  lab:     { title: '🧪 신기술 물약 실험', how: '물약 4개 중 <b class="gold">3개를 맞는 순서</b>로 넣어요. 힌트를 보고 5번 안에 맞혀요!',
+    fact: '조달청은 새로운 기술 제품을 <b>혁신제품</b>으로 지정해서 공공기관이 먼저 써 볼 수 있게 해요.', play: playPotion },
+  robot:   { title: '⚙️ 불량품 골라내기', how: '벨트 위로 물건이 지나가요. <b class="bad">기울어지고 금 간 불량품</b>만 클릭! 좋은 물건을 누르면 감점!',
+    fact: '불량품을 미리 걸러내면 다시 만드는 비용이 줄어서 <b>원가</b>가 낮아져요.', play: playDefect },
+};
+function runMini(k, done) {
+  const M = MINIS[k], u = UPGRADES[k];
+  openModal(`<h2>${u.icon} ${u.name} 설치 미니게임 — ${M.title}</h2>
+    <p>${M.how}</p>
+    <div class="tip" style="font-size:13px">⭐⭐⭐ = 투자비 <b class="gold">30% 할인</b> · ⭐⭐ = <b class="gold">15% 할인</b> · ⭐ = 할인 없음<br>
+      <span class="muted">못해도 시설은 꼭 설치돼요. 부담 없이 해 봐요!</span></div>
+    <div class="modal-acts"><button class="btn ghost" id="mg-skip">건너뛰기 (할인 없음)</button><button class="btn" id="mg-go">시작!</button></div>`);
+  $('mg-skip').onclick = () => finishMini(k, 1, done, true);
+  $('mg-go').onclick = () => {
+    openModal(`<h2>${M.title}</h2><div id="mg-hud" style="font-size:14px;min-height:20px"></div>
+      <div id="mg-area" style="position:relative;height:250px;background:var(--panel2);border:3px solid var(--line);overflow:hidden;user-select:none"></div>`);
+    mgClean(); MG = { timers: [] };
+    M.play($('mg-area'), stars => { mgClean(); finishMini(k, stars, done); });
+  };
+}
+function finishMini(k, stars, done, skipped) {
+  const M = MINIS[k], u = UPGRADES[k], d = MINI_DISCOUNT[stars];
+  const cost = Math.round(u.cost * (1 - d) / 10000) * 10000;
+  beep(stars >= 3 ? 'win' : stars === 2 ? 'clue' : 'click');
+  openModal(`<h2>${u.icon} ${u.name} 설치 완료!</h2>
+    <div style="font-size:40px;text-align:center;line-height:52px;height:52px">${'⭐'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
+    <p style="text-align:center;font-size:15px">${skipped ? '미니게임을 건너뛰었어요.' : stars === 3 ? '완벽해요! 🎉' : stars === 2 ? '잘했어요! 👍' : '아쉽지만 괜찮아요!'}
+      투자비 <b class="gold">${won(cost)}</b>${d ? ` <span class="good">(${Math.round(d * 100)}% 할인, ${won(u.cost - cost)} 아낌!)</span>` : ''}</p>
+    <p style="text-align:center;font-size:13px">✨ 효과: ${u.ds}</p>
+    <div class="tip" style="font-size:12px">💡 <b>실제 세상에서는?</b> ${M.fact}</div>
+    <div class="modal-acts"><button class="btn" id="mg-ok">확인 →</button></div>`);
+  $('mg-ok').onclick = () => done(cost);
+}
+
+/* 🔧 공장: 타이밍 맞추기 */
+function playTiming(area, end) {
+  let tries = 0, hits = 0, pos = 0, dir = 1, speed = 1.1, zone;
+  area.innerHTML = `<div style="position:absolute;left:40px;right:40px;top:80px;height:40px;background:var(--panel);border:3px solid var(--line)">
+      <div id="tm-zone" style="position:absolute;top:0;bottom:0;background:var(--gold)"></div>
+      <div id="tm-needle" style="position:absolute;top:-10px;bottom:-10px;width:6px;background:var(--bad);border:2px solid var(--line)"></div></div>
+    <div id="tm-msg" style="position:absolute;left:0;right:0;top:140px;text-align:center;font-size:18px"></div>
+    <button class="btn" id="tm-btn" style="position:absolute;left:50%;transform:translateX(-50%);bottom:20px">🔧 조립!</button>`;
+  const newZone = () => { const w = 16 - tries * 3; zone = [rand(5, 95 - w), 0]; zone[1] = zone[0] + w; $('tm-zone').style.left = zone[0] + '%'; $('tm-zone').style.width = w + '%'; };
+  const hud = () => mgHud(`도전 <b>${Math.min(tries + 1, 3)}/3</b> · 성공 <b class="gold">${hits}</b>`);
+  newZone(); hud();
+  const tick = () => {
+    pos += dir * speed; if (pos >= 100) { pos = 100; dir = -1; } if (pos <= 0) { pos = 0; dir = 1; }
+    const n = $('tm-needle'); if (!n) return;
+    n.style.left = `calc(${pos}% - 3px)`; MG.raf = requestAnimationFrame(tick);
+  };
+  MG.raf = requestAnimationFrame(tick);
+  let lock = false;
+  const press = () => {
+    if (lock || tries >= 3) return; lock = true;
+    const ok = pos >= zone[0] && pos <= zone[1];
+    if (ok) hits++; tries++;
+    $('tm-msg').innerHTML = ok ? '<b class="good">✅ 딱 맞았어요!</b>' : '<b class="bad">❌ 빗나갔어요!</b>';
+    beep(ok ? 'clue' : 'lose'); hud();
+    mgLater(() => { lock = false; $('tm-msg').innerHTML = ''; if (tries >= 3) end(Math.max(1, hits)); else { speed += 0.5; newZone(); } }, 700);
+  };
+  $('tm-btn').onclick = press;
+  MG.key = e => { if (e.code === 'Space') { e.preventDefault(); press(); } };
+  document.addEventListener('keydown', MG.key);
+}
+
+/* 🚚 트럭: 배송 순서 기억 */
+function playSequence(area, end) {
+  const spots = ['🏫 학교', '🏥 병원', '🏢 구청', '🚒 소방서', '📮 우체국', '🏛️ 도서관'];
+  area.innerHTML = `<div id="sq-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px">
+    ${spots.map((s, i) => `<button class="btn ghost" data-sq="${i}" style="height:96px;font-size:17px">${s}</button>`).join('')}</div>`;
+  const btns = [...area.querySelectorAll('[data-sq]')];
+  let round = 0, ok = 0, seq = [], input = [], listen = false;
+  const flash = (i, on) => { btns[i].style.background = on ? 'var(--gold)' : ''; btns[i].style.color = on ? 'var(--line)' : ''; };
+  const show = () => {
+    listen = false; input = [];
+    seq = [];
+    while (seq.length < 3 + round) { const x = rint(0, 5); if (x !== seq[seq.length - 1]) seq.push(x); }   // 같은 곳이 연달아 나오지 않게
+    mgHud(`도전 <b>${round + 1}/3</b> · 성공 <b class="gold">${ok}</b> · 👀 <b>잘 보세요!</b> (${seq.length}곳)`);
+    seq.forEach((s, n) => { mgLater(() => { flash(s, true); beep('click'); }, 600 + n * 650); mgLater(() => flash(s, false), 600 + n * 650 + 420); });
+    mgLater(() => { listen = true; mgHud(`도전 <b>${round + 1}/3</b> · 성공 <b class="gold">${ok}</b> · 👆 <b class="gold">이제 순서대로 눌러요!</b>`); }, 600 + seq.length * 650);
+  };
+  const next = good => {
+    listen = false; if (good) ok++; round++;
+    mgHud(good ? '<b class="good">✅ 배송 성공!</b>' : '<b class="bad">❌ 순서가 틀렸어요!</b>'); beep(good ? 'clue' : 'lose');
+    mgLater(() => round >= 3 ? end(Math.max(1, ok)) : show(), 900);
+  };
+  btns.forEach((b, i) => b.onclick = () => {
+    if (!listen) return;
+    flash(i, true); mgLater(() => flash(i, false), 180);
+    input.push(i);
+    if (seq[input.length - 1] !== i) return next(false);
+    if (input.length === seq.length) next(true);
+  });
+  show();
+}
+
+/* ♻️ 친환경: 분리수거 */
+function playRecycle(area, end) {
+  const bins = [['paper', '📄 종이'], ['plastic', '🧴 플라스틱'], ['can', '🥫 캔'], ['glass', '🍾 유리']];
+  const trash = [['📰', '신문지', 'paper'], ['📦', '종이 상자', 'paper'], ['📚', '헌 책', 'paper'], ['🧴', '샴푸 통', 'plastic'], ['🥤', '플라스틱 컵', 'plastic'],
+    ['🧴', '세제 통', 'plastic'], ['🥫', '통조림 캔', 'can'], ['🍺', '음료 캔', 'can'], ['🍾', '유리병', 'glass'], ['🫙', '잼 유리병', 'glass']];
+  const list = shuffle(trash);
+  let n = 0, right = 0, left = 15;
+  area.innerHTML = `<div id="rc-item" style="text-align:center;margin-top:18px;font-size:56px;line-height:64px"></div>
+    <div id="rc-name" style="text-align:center;font-size:15px;height:24px"></div>
+    <div style="position:absolute;left:12px;right:12px;bottom:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+    ${bins.map(([k, l]) => `<button class="btn green" data-bin="${k}" style="height:70px;font-size:16px">🗑️<br>${l}</button>`).join('')}</div>`;
+  const hud = () => mgHud(`⏱️ <b class="${left <= 5 ? 'bad' : 'gold'}">${left}초</b> · ${Math.min(n + 1, 10)}/10번째 · 정답 <b class="gold">${right}</b>`);
+  const showItem = () => { $('rc-item').textContent = list[n][0]; $('rc-name').textContent = list[n][1]; hud(); };
+  const stop = () => end(right >= 9 ? 3 : right >= 7 ? 2 : 1);
+  area.querySelectorAll('[data-bin]').forEach(b => b.onclick = () => {
+    if (n >= 10 || left <= 0) return;
+    const good = b.dataset.bin === list[n][2];
+    if (good) right++;
+    beep(good ? 'click' : 'lose');
+    $('rc-name').innerHTML = good ? '<b class="good">✅ 정답!</b>' : `<b class="bad">❌ ${list[n][1]}${josa(list[n][1], '은', '는').slice(list[n][1].length)} ${bins.find(x => x[0] === list[n][2])[1].slice(3)}예요</b>`;
+    n++;
+    if (n >= 10) return mgLater(stop, 500);
+    mgLater(showItem, good ? 250 : 700);
+  });
+  showItem();
+  mgEvery(() => { left--; hud(); if (left <= 0) stop(); }, 1000);
+}
+
+/* 📣 홍보팀: 짝 맞추기 */
+function playMemory(area, end) {
+  const faces = shuffle(['🪑', '💻', '📺', '🧯', '🏀', '🖨️']).concat([]);
+  const cards = shuffle([...faces, ...faces]);
+  let open = [], done = 0, turns = 0, lock = false, left = 40;
+  area.innerHTML = `<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px">
+    ${cards.map((c, i) => `<button class="btn ghost" data-mm="${i}" style="height:104px;font-size:34px">❓</button>`).join('')}</div>`;
+  const btns = [...area.querySelectorAll('[data-mm]')];
+  const hud = () => mgHud(`⏱️ <b class="${left <= 10 ? 'bad' : 'gold'}">${left}초</b> · 뒤집은 횟수 <b>${turns}</b> · 찾은 짝 <b class="gold">${done}/6</b>`);
+  const stop = () => end(done < 6 ? 1 : turns <= 10 ? 3 : turns <= 14 ? 2 : 1);
+  hud();
+  btns.forEach((b, i) => b.onclick = () => {
+    if (lock || open.includes(i) || b.dataset.ok) return;
+    b.textContent = cards[i]; b.style.background = 'var(--text)'; open.push(i); beep('click');
+    if (open.length < 2) return;
+    turns++; hud();
+    const [a, c] = open;
+    if (cards[a] === cards[c]) {
+      btns[a].dataset.ok = btns[c].dataset.ok = '1'; btns[a].style.background = btns[c].style.background = 'var(--good)';
+      open = []; done++; hud(); beep('clue');
+      if (done === 6) mgLater(stop, 500);
+    } else {
+      lock = true;
+      mgLater(() => { [a, c].forEach(j => { btns[j].textContent = '❓'; btns[j].style.background = ''; }); open = []; lock = false; }, 650);
+    }
+  });
+  mgEvery(() => { left--; hud(); if (left <= 0) stop(); }, 1000);
+}
+
+/* 🧪 연구소: 물약 순서 맞추기 (4가지 색 중 3개, 같은 색은 한 번만) */
+function playPotion(area, end) {
+  const cols = [['🔴', '빨강'], ['🟢', '초록'], ['🔵', '파랑'], ['🟡', '노랑']];
+  const secret = shuffle([0, 1, 2, 3]).slice(0, 3);
+  let guess = [], tries = 0;
+  area.innerHTML = `<div style="display:flex;gap:14px;height:100%;padding:10px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:10px;align-items:center">
+        <div id="pt-slots" style="display:flex;gap:10px"></div>
+        <div style="display:flex;gap:8px">${cols.map(([e, n], i) => `<button class="btn ghost" data-pt="${i}" style="font-size:28px;width:64px;height:64px" title="${n}">${e}</button>`).join('')}</div>
+        <div style="display:flex;gap:8px"><button class="btn sm ghost" id="pt-undo">↩️ 지우기</button><button class="btn sm" id="pt-test">🧪 실험하기</button></div>
+      </div>
+      <div id="pt-log" style="width:250px;font-size:13px;line-height:1.7;overflow:auto"></div></div>`;
+  const slots = () => { $('pt-slots').innerHTML = [0, 1, 2].map(s => `<div style="width:56px;height:56px;border:3px dashed var(--gold);display:flex;align-items:center;justify-content:center;font-size:30px">${guess[s] !== undefined ? cols[guess[s]][0] : (s + 1)}</div>`).join(''); };
+  const hud = () => mgHud(`남은 실험 <b class="gold">${5 - tries}번</b> · 🎯 <b>자리까지 맞음</b> = 색도 자리도 맞아요 · 🔄 <b>색만 맞음</b> = 자리가 달라요`);
+  slots(); hud();
+  area.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { const i = +b.dataset.pt; if (guess.length < 3 && !guess.includes(i)) { guess.push(i); beep('click'); slots(); } });
+  $('pt-undo').onclick = () => { guess.pop(); slots(); };
+  $('pt-test').onclick = () => {
+    if (guess.length < 3) { mgHud('<b class="bad">물약 3개를 먼저 넣어 주세요!</b>'); return; }
+    tries++;
+    const exact = guess.filter((g, s) => secret[s] === g).length;
+    const colorOnly = guess.filter(g => secret.includes(g)).length - exact;
+    $('pt-log').insertAdjacentHTML('beforeend', `<div>${tries}. ${guess.map(g => cols[g][0]).join('')} → 🎯 ${exact} · 🔄 ${colorOnly}</div>`);
+    guess = []; slots(); hud();
+    if (exact === 3) { beep('win'); mgHud('<b class="good">🎉 실험 성공! 신기술 발견!</b>'); return mgLater(() => end(tries <= 3 ? 3 : tries <= 4 ? 2 : 1), 900); }
+    beep('lose');
+    if (tries >= 5) { mgHud(`<b class="bad">실험 끝! 정답은 ${secret.map(s => cols[s][0]).join('')}이었어요.</b>`); mgLater(() => end(1), 1400); }
+  };
+}
+
+/* ⚙️ 자동화: 불량품 골라내기 */
+function playDefect(area, end) {
+  const goods = ['🪑', '📦', '🧸', '⚽', '🖥️'];
+  const total = 14, badIdx = new Set(shuffle([...Array(total).keys()]).slice(0, 5));
+  let spawned = 0, caught = 0, missed = 0, wrong = 0, gone = 0;
+  area.innerHTML = `<div style="position:absolute;left:0;right:0;top:90px;height:90px;background:repeating-linear-gradient(90deg,#3a3a4a 0 30px,#2a2a3a 30px 60px);border-top:4px solid var(--line);border-bottom:4px solid var(--line)"></div>`;
+  const hud = () => mgHud(`잡은 불량품 <b class="good">${caught}/5</b> · 놓침 <b class="bad">${missed}</b> · 잘못 누름 <b class="bad">${wrong}</b>`);
+  hud();
+  const finish = () => end(caught === 5 && wrong === 0 ? 3 : caught - wrong >= 3 ? 2 : 1);
+  const spawn = () => {
+    if (spawned >= total) return;
+    const isBad = badIdx.has(spawned++);
+    const el = document.createElement('button');
+    el.className = 'btn ghost';
+    el.style.cssText = `position:absolute;top:98px;left:-80px;width:74px;height:74px;font-size:40px;padding:0;transition:left 4.2s linear;${isBad ? 'transform:rotate(28deg);filter:sepia(1) saturate(3) hue-rotate(-30deg);' : ''}`;
+    el.innerHTML = pick(goods) + (isBad ? '<span style="position:absolute;right:2px;top:0;font-size:22px">💥</span>' : '');
+    area.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => { el.style.left = (area.clientWidth + 10) + 'px'; }));
+    el.onclick = () => {
+      if (el.dataset.done) return; el.dataset.done = '1';
+      if (isBad) { caught++; beep('clue'); el.innerHTML = '✅'; } else { wrong++; beep('lose'); el.innerHTML = '❌'; }
+      el.style.transition = 'opacity .3s'; el.style.opacity = '0'; hud();
+    };
+    mgLater(() => {
+      if (!el.dataset.done && isBad) { missed++; hud(); }
+      el.remove(); gone++;
+      if (gone >= total) finish();
+    }, 4300);
+  };
+  spawn(); mgEvery(spawn, 750);
+}
+
 function showShop(after) {
   const R = BOSS_ROUNDS[G.round];
   let boughtNow = null;                                    // 투자 시간마다 딱 1개만 살 수 있어요
   const draw = () => {
     openModal(`<h2>🏭 회사 투자 시간</h2>
-      <p style="font-size:13px">{이름}, 번 돈으로 회사를 키워요! <b class="gold">이번 투자 시간에는 딱 1개만</b> 고를 수 있어요. 산 시설은 <b class="gold">남은 라운드 내내</b> 효과가 있지만, 쓴 돈은 엔딩의 "번 돈"에서 빠져요. (자금이 100만원 아래로 내려가는 투자는 못 해요)</p>
+      <p style="font-size:13px">{이름}, 번 돈으로 회사를 키워요! <b class="gold">이번 투자 시간에는 딱 1개만</b> 고를 수 있어요. 🎮 투자하면 <b class="gold">미니게임</b>이 나와요. 잘하면 최대 30% 할인! 산 시설은 <b class="gold">남은 라운드 내내</b> 효과가 있지만, 쓴 돈은 엔딩의 "번 돈"에서 빠져요. (자금이 100만원 아래로 내려가는 투자는 못 해요)</p>
       <div class="tip" style="font-size:13px;display:flex;justify-content:space-between;gap:10px;padding:6px 10px">
         <span>📋 다음: <b>${R.item}</b>${R.emergency ? ' — 🚨 긴급 계약' : ' — 중요: <b class="gold">' + topCriteria(R.w) + '</b>'}${R.cond ? ' · <b class="bad">' + CONDS[R.cond].label + '</b>' : ''}</span>
         <span style="white-space:nowrap">💰 <b class="gold num">${won(G.money)}</b></span>
@@ -1561,8 +1801,11 @@ function showShop(after) {
     $('modal-box').querySelectorAll('[data-up]').forEach(btn => btn.onclick = () => {
       const k = btn.dataset.up, u = UPGRADES[k];
       if (boughtNow || G.upgrades.includes(k) || G.money - u.cost < 1000000) return;
-      G.money -= u.cost; G.invested += u.cost; G.upgrades.push(k); boughtNow = k;
-      beep('clue'); draw();
+      runMini(k, cost => {                                   // 🎮 미니게임 결과로 투자비가 정해져요
+        G.money -= cost; G.invested += cost; G.upgrades.push(k); boughtNow = k;
+        $('b-money').textContent = won(G.money);
+        draw();
+      });
     });
     $('shop-go').onclick = () => { closeModal(); after(); };
     $('shop-go').focus({ preventScroll: true });
