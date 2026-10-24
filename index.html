@@ -272,7 +272,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v3.8</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v3.9</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -1758,10 +1758,10 @@ function finishMini(k, stars, done, skipped) {
 function playTiming(area, end) {
   // 속도는 '1초에 몇 %'로 정해요 → 모니터가 빨라도(144Hz 등) 바늘 속도가 똑같아요
   const SPEEDS = EASY ? [35, 45, 55] : [45, 60, 75], WIDTHS = EASY ? [20, 17, 15] : [16, 13, 10];
-  let tries = 0, hits = 0, pos = 0, dir = 1, zone, last = null;
+  let tries = 0, hits = 0, pos = 0, dir = 1, zone, last = null, lock = false;
   area.innerHTML = `<div style="position:absolute;left:40px;right:40px;top:80px;height:40px;background:var(--panel);border:3px solid var(--line)">
       <div id="tm-zone" style="position:absolute;top:0;bottom:0;background:var(--gold)"></div>
-      <div id="tm-needle" style="position:absolute;top:-10px;bottom:-10px;width:6px;background:var(--bad);border:2px solid var(--line)"></div></div>
+      <div id="tm-needle" style="position:absolute;top:0;bottom:0;width:6px;background:var(--bad);border:2px solid var(--line)"></div></div>
     <div id="tm-msg" style="position:absolute;left:0;right:0;top:140px;text-align:center;font-size:18px"></div>
     <button class="btn" id="tm-btn" style="position:absolute;left:50%;transform:translateX(-50%);bottom:20px">🔧 조립!</button>`;
   const newZone = () => { document.querySelectorAll('.tm-mark').forEach(m => m.remove()); const w = WIDTHS[Math.min(tries, 2)]; zone = [rand(5, 95 - w), 0]; zone[1] = zone[0] + w; $('tm-zone').style.left = zone[0] + '%'; $('tm-zone').style.width = w + '%'; };
@@ -1769,12 +1769,12 @@ function playTiming(area, end) {
   newZone(); hud();
   const tick = now => {
     const dt = last === null ? 0 : Math.min(50, now - last) / 1000; last = now;
-    pos += dir * SPEEDS[Math.min(tries, 2)] * dt; if (pos >= 100) { pos = 100; dir = -1; } if (pos <= 0) { pos = 0; dir = 1; }
+    if (!lock) pos += dir * SPEEDS[Math.min(tries, 2)] * dt;   // 누른 뒤 2초 동안은 바늘이 멈춰요
+    if (pos >= 100) { pos = 100; dir = -1; } if (pos <= 0) { pos = 0; dir = 1; }
     const n = $('tm-needle'); if (!n) return;
     n.style.left = `calc(${pos}% - 3px)`; MG.raf = requestAnimationFrame(tick);
   };
   MG.raf = requestAnimationFrame(tick);
-  let lock = false;
   const press = () => {
     if (lock || tries >= 3) return; lock = true;
     const ok = pos >= zone[0] && pos <= zone[1];
@@ -1785,7 +1785,7 @@ function playTiming(area, end) {
     $('tm-needle').parentElement.appendChild(mark);
     $('tm-msg').innerHTML = ok ? '<b class="good">✅ 딱 맞았어요!</b>' : '<b class="bad">❌ 빗나갔어요!</b>';
     beep(ok ? 'clue' : 'lose'); hud();
-    mgLater(() => { lock = false; $('tm-msg').innerHTML = ''; if (tries >= 3) end(Math.max(1, hits)); else newZone(); }, 700);
+    mgLater(() => { lock = false; $('tm-msg').innerHTML = ''; if (tries >= 3) end(Math.max(1, hits)); else newZone(); }, 2000);   // 결과를 2초 보여주고 다시 시작
   };
   $('tm-btn').onclick = press;
   MG.key = e => { if (e.code === 'Space') { e.preventDefault(); press(); } };
