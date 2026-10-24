@@ -265,7 +265,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v2.9</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v3.0</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -274,7 +274,7 @@
       <button class="btn sm ghost" onclick="confirmQuit()">← 처음으로</button>
       <span class="grow player-tag" id="b-title">🏢 사장님 모드</span>
       <button class="btn sm ghost" onclick="showHowTo('boss')">❓ 도움말</button>
-      <span class="stat">라운드 <b id="b-round">1</b>/5</span>
+      <span class="stat">라운드 <b id="b-round">1</b>/<span class="r-total">5</span></span>
       <span class="stat">회사 자금 <b id="b-money" class="num">1,000만원</b></span>
       <span class="stat" id="b-ups" title="우리 회사 시설">시설 <b>-</b></span>
       <span class="stat">🧩 <b class="clue-count">0</b>/5</span>
@@ -316,7 +316,7 @@
       <button class="btn sm ghost" onclick="confirmQuit()">← 처음으로</button>
       <span class="grow player-tag" id="o-title">🏛️ 조달청 담당자 모드</span>
       <button class="btn sm ghost" onclick="showHowTo('officer')">❓ 도움말</button>
-      <span class="stat">라운드 <b id="o-round">1</b>/5</span>
+      <span class="stat">라운드 <b id="o-round">1</b>/<span class="r-total">5</span></span>
       <span class="stat" id="o-timer-box" hidden>⏱️ <b id="o-timer">30</b>초</span>
       <span class="stat">아낀 나랏돈 <b id="o-saved" class="num">0원</b></span>
       <span class="stat" title="라운드마다 얼마나 알맞은 회사를 골랐는지 (평균)">⭐ <b id="o-judge">-</b></span>
@@ -515,7 +515,10 @@ function makeCriteria(it, future) {
   const say = tie
     ? `${josa(n1, '과', '와')} ${josa(n2, '이', '가')} 똑같이 제일 중요해요! (${n1}: ${why[top]} · ${n2}: ${why[second]})`
     : `${why[top]} ${josa(n1, '이', '가')} 제일 중요하고, ${why[second]} ${n2}도 중요하게 봐요.`;   // 조아 말풍선은 글자 그대로 나와서 꾸밈 태그 없이 써요
-  return { w, say };
+  const short = tie                                // 🐣 쉬움 모드용 짧은 말
+    ? `${josa(n1, '과', '와')} ${josa(n2, '이', '가')} 똑같이 제일 중요해요!`
+    : `${josa(n1, '이', '가')} 제일 중요하고, 그다음은 ${josa(n2, '이에요', '예요')}.`;
+  return { w, say, short };
 }
 /* ⚖️ 이 심사 기준이면, 잘 고른 카드와 가격으로 이길 확률이 얼마나 될까? (게임 시작 전에 몰래 계산해요) */
 function winChance(R, si) {
@@ -532,7 +535,7 @@ function winChance(R, si) {
     cards.forEach(k => CARDS[k].apply(b)); b.price = roundPrice(b.price);
     return b;
   };
-  const N = 20; let best = 0;
+  const N = 20; let best = 0, bestPair = null, bestPrice = 0;
   for (let i = 0; i < NORMAL_CARDS.length; i++) for (let j = i + 1; j < NORMAL_CARDS.length; j++) {
     const me = { quality: 3, speed: 3, eco: 0, track: 0, innov: 0, costMul: 1 };
     CARDS[NORMAL_CARDS[i]].apply(me); CARDS[NORMAL_CARDS[j]].apply(me);
@@ -543,9 +546,10 @@ function winChance(R, si) {
       const ms = scoreBid({ ...me, price }, R).total; if (ms <= -999) continue;
       let w = 0;
       for (let n = 0; n < N; n++) if (rivals.every(c => { const b = fake(c), s = scoreBid(b, R).total; return ms > s || (ms === s && price < b.price); })) w++;
-      best = Math.max(best, w / N);
+      if (w / N > best || (w / N === best && price > bestPrice && bestPair && bestPair[0] === NORMAL_CARDS[i] && bestPair[1] === NORMAL_CARDS[j])) { best = w / N; bestPair = [NORMAL_CARDS[i], NORMAL_CARDS[j]]; bestPrice = price; }
     }
   }
+  winChance.pair = bestPair; winChance.price = bestPrice;   // 🐣 쉬움 모드 힌트에 써요
   return best;
 }
 function buildBossRounds() {
@@ -564,14 +568,14 @@ function buildBossRounds() {
       for (let t = 0; t < 8; t++) {
         R.w = condFix(crit.w, R.cond);
         const chance = winChance(R, si);
-        if (!bestTry || Math.abs(chance - 0.8) < Math.abs(bestTry.chance - 0.8)) bestTry = { crit, chance };
+        if (!bestTry || Math.abs(chance - 0.8) < Math.abs(bestTry.chance - 0.8)) bestTry = { crit, chance, pair: winChance.pair, price: winChance.price };
         if (chance >= 0.55) break;
         crit = makeCriteria(it, !!sl.future);
       }
-      crit = bestTry.crit; R.w = crit.w;
+      crit = bestTry.crit; R.w = crit.w; R.hint = bestTry.pair; R.hintPrice = bestTry.price;
     }
     R.news = (it.news || `${R.who}, ${R.item} ${R.qty.toLocaleString()}${R.unit} 구매 입찰 공고`) + (sl.newsTail || '');
-    R.joa = (it.joa || it.intro + ' ' + crit.say) + (R.cond ? ' ' + CONDS[R.cond].joa : '') + (sl.joaTail || '');
+    R.joa = (it.joa || it.intro + ' ' + (EASY ? crit.short : crit.say)) + (R.cond ? ' ' + CONDS[R.cond].joa : '') + (sl.joaTail || '');
     R.real = R.future ? `2050년 미래 사업이라 상상한 금액이에요. ${it.fact}`
       : (R.min === R.max ? `실제로는 1${R.unit}에 ${unitPrice(R.min)}, ${R.qty.toLocaleString()}${R.unit}이면 약 ${won(R.min * R.qty)}이에요. `
                          : `${R.qty.toLocaleString()}${R.unit}이면 실제로는 약 ${won(R.min * R.qty)}~${won(R.max * R.qty)}이에요. `) + it.fact;
@@ -639,7 +643,7 @@ function buildOfficerRounds() {
     R.budget = R.cond === 'budget' ? Math.max(Math.round(R.min * 1.1), Math.round(R.max * CONDS.budget.cut)) : R.max;
     condFix(R.w, R.cond);
     R.news = it.news || `${R.who}, ${R.item} ${R.qty.toLocaleString()}${R.unit} 구매 입찰 공고`;
-    R.joa = O_JOA[si] + (crit ? ' ' + crit.say : '') + (R.cond ? ' ' + CONDS[R.cond].joa : '');
+    R.joa = O_JOA[si] + (crit ? ' ' + (EASY ? crit.short : crit.say) : '') + (R.cond ? ' ' + CONDS[R.cond].joa : '');
     R.real = R.future ? `2050년 미래 사업이라 상상한 금액이에요. 가장 싼 곳이 아니라 믿을 수 있는 곳을 고르는 게 진짜 아끼는 거예요.`
       : (R.min === R.max ? `실제로는 1${R.unit}에 ${unitPrice(R.min)}, ${R.qty.toLocaleString()}${R.unit}이면 약 ${won(R.min * R.qty)}이에요. `
                          : `${R.qty.toLocaleString()}${R.unit}이면 실제로는 약 ${won(R.min * R.qty)}~${won(R.max * R.qty)}이에요. `) + it.fact;
@@ -771,7 +775,16 @@ function paintSprite(canvas) {
    도움 함수 (돈 표시, 소리, 화면 이동 등)
    ============================================================= */
 const $ = id => document.getElementById(id);
-function unitPrice(n) { return Math.round(n).toLocaleString() + '원'; }
+var EASY = false;                                 // 🐣 쉬움 모드인지 (var라서 어디서든 바로 쓸 수 있어요)
+function unitPrice(n) {
+  n = Math.round(n);
+  if (EASY && n >= 10000) {                       // 🐣 쉬움: 66,990원 → 약 6만 7천원
+    let m = Math.floor(n / 10000), c = Math.round((n % 10000) / 1000);
+    if (c === 10) { m++; c = 0; }
+    return `약 ${m.toLocaleString()}만${c ? ' ' + c + '천' : ''}원`;
+  }
+  return n.toLocaleString() + '원';
+}
 function won(n) {
   const s = n < 0 ? '-' : ''; n = Math.abs(Math.round(n));
   if (n >= 100000000) { const e = Math.floor(n / 1e8), m = Math.round((n % 1e8) / 1e4); return s + e + '억' + (m ? ' ' + m.toLocaleString() + '만' : '') + '원'; }
@@ -957,8 +970,19 @@ function honorific() {
   const nick = PLAYER.nick || '플레이어';
   return nick + (G && G.mode === 'officer' ? ' 주무관님' : ' 사장님');
 }
-function say(text) { return String(text).split('{이름}').join(esc(honorific())); }
-function joaSay(which, text) { $(which + '-joa').textContent = String(text).split('{이름}').join(honorific()); }
+/* 🐣 쉬움 모드: 어려운 낱말 뒤에 쉬운 뜻을 붙여요 (글마다 처음 나올 때 한 번만) */
+const GLOSS = { '덤핑': '너무 싸게 팔기', '담합': '몰래 짜고 가격 맞추기', '납기': '배달 속도', '낙찰': '계약 따냄', '유찰': '아무도 못 땀',
+  '개찰': '입찰서 열어 보기', '원가': '만드는 데 드는 돈', '예산': '쓸 수 있는 돈', '지체상금': '늦어서 내는 벌금', '부정청탁': '규칙을 어기게 하는 부탁' };
+function gloss(text) {
+  if (!EASY) return text;
+  const used = new Set();
+  return String(text).split(/(<[^>]*>)/).map(part => part.startsWith('<') ? part : part.replace(/덤핑|담합|납기|낙찰|유찰|개찰|원가|예산|지체상금|부정청탁/g, (w, i, all) => {
+    if (used.has(w) || all[i + w.length] === '(') return w;
+    used.add(w); return `${w}(${GLOSS[w]})`;
+  })).join('');
+}
+function say(text) { return gloss(String(text).split('{이름}').join(esc(honorific()))); }
+function joaSay(which, text) { $(which + '-joa').textContent = gloss(String(text).split('{이름}').join(honorific())); }
 function modeTint(mode) { return mode === 'officer' ? PALETTE.B : PALETTE.O; }
 function showProfile(mode, after) {
   let gender = PLAYER.gender || 'boy';
@@ -970,6 +994,8 @@ function showProfile(mode, after) {
     <span id="nick-err" class="bad" style="font-size:12px;min-height:16px"></span>
     <div class="label">캐릭터</div>
     <div id="gender-row" style="display:flex;gap:12px"></div>
+    <div class="label">난이도</div>
+    <div id="level-row" style="display:flex;gap:10px"></div>
     <div class="modal-acts">
       <button class="btn ghost" id="pf-cancel">취소</button>
       <button class="btn ${mode}" id="pf-ok">시작하기 →</button>
@@ -991,10 +1017,18 @@ function showProfile(mode, after) {
     });
   };
   drawRow();
+  let level = PLAYER.level || 'normal';
+  const LEVELS = [['easy', '🐣 쉬움', '3라운드 · 쉬운 말 · 힌트 많이'], ['normal', '🦁 보통', '5라운드 · 진짜 조달처럼']];
+  const drawLevel = () => {
+    $('level-row').innerHTML = LEVELS.map(([k, n, d]) => `<button class="btn ${k === level ? '' : 'ghost'}" data-lv="${k}" aria-pressed="${k === level}" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 14px">
+      <span style="font-size:16px">${n}</span><span style="font-size:11px">${d}</span></button>`).join('');
+    $('level-row').querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { level = b.dataset.lv; beep('click'); drawLevel(); });
+  };
+  drawLevel();
   const ok = () => {
     const nick = input.value.trim();
     if (!nick) { $('nick-err').textContent = '닉네임을 입력해 주세요.'; input.focus(); return; }
-    PLAYER = { nick, gender };
+    PLAYER = { nick, gender, level };
     try { localStorage.setItem('naraPlayer', JSON.stringify(PLAYER)); } catch (e) {}
     closeModal(); after();
   };
@@ -1080,25 +1114,35 @@ function paintPlayerTag(mode) {
   el.innerHTML = '';
   el.style.cssText = 'display:flex;align-items:center;gap:8px';
   el.appendChild(makeSprite(PLAYER.gender || 'boy', 2, modeTint(mode)));
-  el.insertAdjacentHTML('beforeend', `<span>${mode === 'officer' ? '🏛️' : '🏢'} ${esc(honorific())}</span>`);
+  el.insertAdjacentHTML('beforeend', `<span>${mode === 'officer' ? '🏛️' : '🏢'} ${esc(honorific())}${EASY ? ' <span class="stat" style="font-size:11px;padding:1px 6px">🐣 쉬움</span>' : ''}</span>`);
 }
 
 /* =============================================================
    게임 상태
    ============================================================= */
 let G = null;
+function advanceRound() {                       // 다음 라운드로 (쉬움 모드는 몇 라운드를 건너뛰어요)
+  G.step++;
+  G.round = G.step < G.order.length ? G.order[G.step] : 5;
+}
+function isLastRound() { return G.step >= G.order.length - 1; }
 function startMode(mode) {
   // 모드를 누르면 먼저 닉네임과 캐릭터를 골라요
   G = { mode };
   showProfile(mode, () => playStory(mode, () => beginMode(mode)));   // 정보 입력 → 오프닝 이야기 → 게임 시작
 }
 function beginMode(mode) {
+  EASY = PLAYER.level === 'easy';                           // 🐣 쉬움 모드는 판을 만들기 전에 정해요 (숫자 표시가 달라져요)
   if (mode === 'boss') BOSS_ROUNDS = buildBossRounds();   // 판마다 물건과 조건이 새로 뽑혀요
   if (mode === 'officer') OFFICER_ROUNDS = buildOfficerRounds();
   const temptPlan = mode === 'officer' ? shuffle(Object.keys(TEMPTS)).slice(0, 2) : [];   // 2·3라운드에 유혹 이벤트
   if (G && G.timerId) clearInterval(G.timerId);
   G = { mode, round: 0, money: 10000000, saved: 0, honesty: 0, boughtCheap: false, colluded: false, docsFixed: false, picked: [], hand: [], reported: new Set(), analyzed: false, analyzeLeft: 3, upgrades: [], invested: 0, judges: [], wrongReports: 0, timerId: null, log: [], lens: 3, evidence: new Map(), evReports: 0, tempts: {}, temptWon: 0, temptTotal: 0 };   // analyzeLeft: 조아 분석 기회 (게임 전체)
-  G.tempts = { 1: temptPlan[0], 2: temptPlan[1] };
+  G.easy = EASY;
+  G.order = EASY ? (mode === 'boss' ? [0, 1, 4] : [0, 2, 4]) : [0, 1, 2, 3, 4];   // 🐣 쉬움은 3라운드만
+  G.step = 0; G.round = G.order[0];
+  G.tempts = EASY ? { 2: temptPlan[0] } : { 1: temptPlan[0], 2: temptPlan[1] };
+  document.querySelectorAll('.r-total').forEach(e => e.textContent = G.order.length);
   showScreen(mode);
   paintPlayerTag(mode);
   mode === 'boss' ? bossRound() : officerRound();
@@ -1246,13 +1290,13 @@ function bossRound() {
   sl.oninput = () => { G.bidPrice = Number(sl.value); renderPrice(); $('b-memark').classList.add('drag'); };
   sl.onchange = () => $('b-memark').classList.remove('drag');
   sl.onpointerup = sl.onblur = () => $('b-memark').classList.remove('drag');
-  $('b-round').textContent = G.round + 1;
+  $('b-round').textContent = G.step + 1;
   $('b-money').textContent = won(G.money);
   $('b-req').innerHTML = reqBox(R);
   joaSay('b', R.joa);
   buildPriceBar();
   renderBoss();
-  newsIntro(R, G.round + 1, () => {
+  newsIntro(R, G.step + 1, () => {
     if (R.choice === 'collude') bossCollude();
     else if (R.choice === 'docs') bossDocs();
   });
@@ -1340,6 +1384,8 @@ function renderBoss() {
       }).join('');
   $('b-hand').innerHTML = '';
   $('b-hand-label').textContent = R.emergency ? '① 긴급 계약이라 카드 없이 가격만 정해요' : '① 전략 카드 2장을 고르세요 (경쟁 회사는 💸가격 내리기 카드도 써요)';
+  if (EASY && R.hint && !R.emergency)               // 🐣 쉬움: 조아 추천이 카드 위에 계속 보여요
+    $('b-hand-label').innerHTML = `① 카드 2장 고르기 &nbsp;<span style="background:var(--gold);color:var(--line);padding:1px 8px;border:2px solid var(--line)">💡 조아 추천: ${R.hint.map(k => CARDS[k].em + ' ' + CARDS[k].name).join(' + ')} · 가격 ${unitPrice(R.hintPrice)}쯤</span>`;
   if (R.emergency) $('b-hand').innerHTML = '<div class="box" style="grid-column:1/-1;text-align:center;font-size:13px">🚨 피해 주민들이 구호물품을 기다리고 있어요. 1장에 얼마를 받을지 정하세요.</div>';
   G.hand.forEach(k => {
     const c = CARDS[k];
@@ -1413,6 +1459,7 @@ function rivalBid(k, R) {
   let price = R.base * mul;
   if (G.colluded && G.round === 2) price *= 1.25;                // 담합: 다른 회사들이 일부러 비싸게
   if (k === 'black' && G.round === 1) price = R.min * 0.55;
+  if (EASY) price *= 1.1;                                          // 🐣 쉬움: 경쟁 회사가 조금 비싸게 써요
   if (k !== 'black') price = Math.min(price, (R.budget || R.max) * rand(0.93, 1));   // 보통 회사는 예산을 넘기지 않아요
   const b = { k, name: c.name, emoji: c.emoji, price, quality: c.quality, speed: c.speed, eco: c.eco, track: 0, innov: 0, costMul: 1, honesty: 0 };
   // 경쟁 회사도 자기 스타일 카드 중 2장을 써요
@@ -1984,7 +2031,7 @@ function bossSubmit() {
       : `<div style="flex:1;height:14px;background:var(--panel2);border:2px solid var(--line)"><div style="width:${Math.round(100 * Math.max(0, r.score) / mx)}%;height:100%;background:${mine ? 'var(--gold)' : top ? 'var(--good)' : 'var(--muted)'}"></div></div>`;
     return `<div style="display:flex;align-items:center;gap:8px;font-size:13px;${mine ? 'font-weight:bold;color:var(--gold)' : ''}">
       <span style="width:34px">${out ? '❌' : ++rk + '등'}</span>
-      <span style="width:160px;white-space:nowrap">${nm}${top ? ' 👑' : ''}${r.dumping ? ' <span class="bad" style="font-size:11px">⚠️덤핑</span>' : ''}</span>
+      <span style="width:160px;white-space:nowrap">${nm}${top ? ' 👑' : ''}${r.dumping ? ` <span class="bad" style="font-size:11px">${EASY ? '⚠️너무 쌈' : '⚠️덤핑'}</span>` : ''}</span>
       ${bar}<b style="width:44px;text-align:right">${out ? '' : r.score + '점'}</b></div>`;
   }).join('');
   const chip = t => `<span class="stat" style="font-size:13px">${t}</span>`;
@@ -2007,8 +2054,8 @@ function bossSubmit() {
         <div class="tip" style="font-size:12px">💡 <b>실제 세상에서는?</b> ${R.real}</div>
       </div>
     </details>
-    <div class="modal-acts"><button class="btn" id="next-btn">${G.round < 4 ? '다음 라운드 →' : '결과 보기 →'}</button></div>`);
-  $('next-btn').onclick = () => { closeModal(); G.round++; if (G.money <= 0) G.round = 5; G.round < 5 ? showShop(bossRound) : finish(); };
+    <div class="modal-acts"><button class="btn" id="next-btn">${!isLastRound() ? '다음 라운드 →' : '결과 보기 →'}</button></div>`);
+  $('next-btn').onclick = () => { closeModal(); advanceRound(); if (G.money <= 0) G.round = 5; G.round < 5 ? showShop(bossRound) : finish(); };
   };
   if (R.emergency) showResult(); else playReveal(rows, R, showResult);   // 긴급 계약은 경쟁이 없어서 바로 결과
 }
@@ -2031,9 +2078,9 @@ function stopTimer() { if (G && G.timerId) { clearInterval(G.timerId); G.timerId
 function officerRound() {
   const R = OFFICER_ROUNDS[G.round];
   G.reported = new Set(); G.wrongReports = 0; G.analyzed = false; G.roundOver = false;
-  G.lens = 3; G.evidence = new Map(); G.checked = new Set(); G.evReports = 0; $('o-lens').textContent = G.lens;
+  G.lens = EASY ? 5 : 3; G.evidence = new Map(); G.checked = new Set(); G.evReports = 0; $('o-lens').textContent = G.lens;
   stopTimer();
-  $('o-round').textContent = G.round + 1;
+  $('o-round').textContent = G.step + 1;
   $('o-saved').textContent = won(G.saved);
   $('o-judge').textContent = G.judges.length ? Math.round(G.judges.reduce((a, b) => a + b, 0) / G.judges.length) : '-';
   $('o-req').innerHTML = reqBox(R);
@@ -2041,8 +2088,8 @@ function officerRound() {
   $('o-analyze').disabled = G.analyzeLeft <= 0;
   $('o-analyze').textContent = G.analyzeLeft > 0 ? `🤖 조아에게 가격 분석 맡기기 (남은 기회 ${G.analyzeLeft}/3)` : '🤖 분석 기회를 다 썼어요 (0/3)';
   renderOfficer();
-  const go = () => { if (R.emergency) startTimer(); };
-  newsIntro(R, G.round + 1, () => {
+  const go = () => { if (R.emergency && !EASY) startTimer(); };   // 🐣 쉬움 모드는 시간 제한이 없어요
+  newsIntro(R, G.step + 1, () => {
     if (R.choice === 'friend') officerFriend(go);
     else if (R.choice === 'blackfinal') officerBlack();
     else if (G.tempts[G.round]) showTempt(G.tempts[G.round], go);
@@ -2286,7 +2333,7 @@ function timeUp() {
     <p>계약이 늦어져서 구호물품이 늦게 도착했어요. 급하게 다시 구하느라 <b class="bad">${won(loss)}</b>이 더 들었어요.</p>
     <p>🤖 조아: 긴급 상황에서는 빨리 판단하는 것도 중요해요!</p>
     <div class="modal-acts"><button class="btn" id="next-btn">다음 라운드 →</button></div>`);
-  $('next-btn').onclick = () => { closeModal(); G.round++; G.round < 5 ? officerRound() : finish(); };
+  $('next-btn').onclick = () => { closeModal(); advanceRound(); G.round < 5 ? officerRound() : finish(); };
 }
 function officerPick(i, forcedFriend) {
   if (G.roundOver) return;
@@ -2453,8 +2500,8 @@ function officerPick(i, forcedFriend) {
         <div class="tip" style="font-size:12px">💡 <b>실제 세상에서는?</b> ${R.real}</div>
       </div>
     </details>
-    <div class="modal-acts"><button class="btn" id="next-btn">${G.round < 4 ? '다음 라운드 →' : '결과 보기 →'}</button></div>`);
-  $('next-btn').onclick = () => { closeModal(); G.round++; G.round < 5 ? officerRound() : finish(); };
+    <div class="modal-acts"><button class="btn" id="next-btn">${!isLastRound() ? '다음 라운드 →' : '결과 보기 →'}</button></div>`);
+  $('next-btn').onclick = () => { closeModal(); advanceRound(); G.round < 5 ? officerRound() : finish(); };
 }
 
 /* =============================================================
