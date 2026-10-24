@@ -272,7 +272,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v3.9</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v4.0</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -425,7 +425,7 @@ const SLOTS = [
     rivals: ['green', 'fast', 'cheap', 'black'],
     w: { price: 2, quality: 1, speed: 1, eco: 0, track: 1, innov: 0 },
     newsTail: ' … 정체불명의 "블랙 컴퍼니"도 첫 입찰',
-    joaTail: ' 그런데 블랙 컴퍼니라는 회사가 처음 나타났어요…',
+    joaTail: ' 🕶️ 블랙 컴퍼니가 처음 나타났어요…',
     items: [
       { item: '노트북컴퓨터', who: ['별빛구청', '하늘시청'], unit: '대', qty: [20, 30, 40], min: 1200000, max: 4100000,
         intro: '구청에서 직원들이 쓸 노트북을 사요.',
@@ -447,7 +447,7 @@ const SLOTS = [
   { // 3라운드: 납기가 급해요 + 블랙 컴퍼니의 담합 제안
     rivals: ['slow', 'cheap', 'green'], choice: 'collude',
     w: { price: 1, quality: 1.5, speed: 2, eco: 1, track: 0.5, innov: 0 },
-    joaTail: ' 그런데 {이름}, 블랙 컴퍼니에서 쪽지가 왔어요.',
+    joaTail: ' 🕶️ 블랙 컴퍼니에서 쪽지가 왔어요.',
     items: [
       { item: '공원 벤치 (3인용)', who: ['푸른시 공원관리소'], unit: '개', qty: [40, 50, 60], min: 570000, max: 1770000,
         intro: '새로 여는 공원에 벤치를 놓아요.',
@@ -475,7 +475,7 @@ const SLOTS = [
   { // 5라운드: 2050 미래 대형 사업 (상상한 금액) + 서류 조작 유혹
     rivals: ['slow', 'cheap', 'black'], future: true, choice: 'docs',
     w: { price: 0.5, quality: 1, speed: 0.5, eco: 1, track: 1.5, innov: 2 },
-    joaTail: ' 그런데… 품질 검사에서 작은 문제가 발견됐어요.',
+    joaTail: ' 그런데… 품질 검사에서 문제가 생겼어요.',
     items: [
       { item: '2050 스마트 도서관', who: ['미래시 교육청'], unit: '식', qty: [1], min: 400000000, max: 600000000,
         intro: '{이름}, 마지막 큰 계약! 미래 도서관을 지어요.',
@@ -493,11 +493,11 @@ const SLOTS = [
 ];
 /* 특별 조건: 못 지키면 점수와 상관없이 "자격 미달"로 탈락해요 (경쟁 회사도 똑같아요) */
 const CONDS = {
-  eco:     { label: '🌿 친환경 인증 필수',       card: 'eco',     test: b => !!b.eco,        joa: '이번엔 🌿친환경 인증이 없으면 아예 탈락이에요!' },
-  quality: { label: '🔧 품질 ★★★★ 이상만',      card: 'quality', test: b => b.quality >= 4, joa: '이번엔 품질이 ★★★★ 이상이어야 입찰할 수 있어요!' },
-  fast:    { label: "🚚 납기 '빠름' 이상만",      card: 'speed',   test: b => b.speed >= 4,   joa: "이번엔 납기가 '빠름' 이상이어야 입찰할 수 있어요!" },
-  track:   { label: '📈 납품 실적 있는 회사만',  card: 'track',   test: b => !!b.track,      joa: '이번엔 📈납품 실적이 있어야 입찰할 수 있어요!' },
-  budget:  { label: '✂️ 예산 15% 삭감',          cut: 0.85,                                  joa: '예산이 15% 줄었어요! 예산을 넘기면 탈락이니 조심하세요.' },
+  eco:     { label: '🌿 친환경 인증 필수',       card: 'eco',     test: b => !!b.eco,        joa: '🌿친환경 인증 없으면 탈락!' },
+  quality: { label: '🔧 품질 ★★★★ 이상만',      card: 'quality', test: b => b.quality >= 4, joa: '품질 ★★★★ 아래는 탈락!' },
+  fast:    { label: "🚚 납기 '빠름' 이상만",      card: 'speed',   test: b => b.speed >= 4,   joa: "납기 '빠름' 아래는 탈락!" },
+  track:   { label: '📈 납품 실적 있는 회사만',  card: 'track',   test: b => !!b.track,      joa: '📈납품 실적 없으면 탈락!' },
+  budget:  { label: '✂️ 예산 15% 삭감',          cut: 0.85,                                  joa: '예산 15% 삭감! 넘기면 탈락!' },
 };
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 /* 🎲 심사 기준 뽑기: 같은 물건이 나와도 판마다 "제일 중요한 것"과 "그다음"이 랜덤으로 바뀌어요.
@@ -525,7 +525,10 @@ function makeCriteria(it, future) {
   const short = tie                                // 🐣 쉬움 모드용 짧은 말
     ? `${josa(n1, '과', '와')} ${josa(n2, '이', '가')} 똑같이 제일 중요해요!`
     : `${josa(n1, '이', '가')} 제일 중요하고, 그다음은 ${josa(n2, '이에요', '예요')}.`;
-  return { w, say, short };
+  const mid = tie                                  // 🦁 보통 모드용: 이유는 제일 중요한 것 하나만 말해요
+    ? short
+    : `${why[top]} ${josa(n1, '이', '가')} 제일 중요! 그다음은 ${josa(n2, '이에요', '예요')}.`;
+  return { w, say, short, mid };
 }
 /* ⚖️ 이 심사 기준이면, 잘 고른 카드와 가격으로 이길 확률이 얼마나 될까? (게임 시작 전에 몰래 계산해요) */
 function winChance(R, si) {
@@ -582,7 +585,8 @@ function buildBossRounds() {
       crit = bestTry.crit; R.w = crit.w; R.hint = bestTry.pair; R.hintPrice = bestTry.price;
     }
     R.news = (it.news || `${R.who}, ${R.item} ${R.qty.toLocaleString()}${R.unit} 구매 입찰 공고`) + (sl.newsTail || '');
-    R.joa = (it.joa || it.intro + ' ' + (EASY ? crit.short : crit.say)) + (R.cond ? ' ' + CONDS[R.cond].joa : '') + (sl.joaTail || '');
+    // 조아 말은 짧게! 물건 이름은 요청서에 있으니 빼고, 기준·조건·사건만 말해요
+    R.joa = (it.joa || `{이름}, ${si === 0 ? '첫 입찰! ' : si === 4 ? '마지막 큰 계약! ' : ''}${EASY ? crit.short : crit.mid}`) + (R.cond ? ' ' + CONDS[R.cond].joa : '') + (sl.joaTail || '');
     R.real = R.future ? `2050년 미래 사업이라 상상한 금액이에요. ${it.fact}`
       : (R.min === R.max ? `실제로는 1${R.unit}에 ${unitPrice(R.min)}, ${R.qty.toLocaleString()}${R.unit}이면 약 ${won(R.min * R.qty)}이에요. `
                          : `${R.qty.toLocaleString()}${R.unit}이면 실제로는 약 ${won(R.min * R.qty)}~${won(R.max * R.qty)}이에요. `) + it.fact;
@@ -650,7 +654,7 @@ function buildOfficerRounds() {
     R.budget = R.cond === 'budget' ? Math.max(Math.round(R.min * 1.1), Math.round(R.max * CONDS.budget.cut)) : R.max;
     condFix(R.w, R.cond);
     R.news = it.news || `${R.who}, ${R.item} ${R.qty.toLocaleString()}${R.unit} 구매 입찰 공고`;
-    R.joa = O_JOA[si] + (crit ? ' ' + (EASY ? crit.short : crit.say) : '') + (R.cond ? ' ' + CONDS[R.cond].joa : '');
+    R.joa = O_JOA[si] + (crit ? ' ' + (EASY ? crit.short : crit.mid) : '') + (R.cond ? ' ' + CONDS[R.cond].joa : '');
     R.real = R.future ? `2050년 미래 사업이라 상상한 금액이에요. 가장 싼 곳이 아니라 믿을 수 있는 곳을 고르는 게 진짜 아끼는 거예요.`
       : (R.min === R.max ? `실제로는 1${R.unit}에 ${unitPrice(R.min)}, ${R.qty.toLocaleString()}${R.unit}이면 약 ${won(R.min * R.qty)}이에요. `
                          : `${R.qty.toLocaleString()}${R.unit}이면 실제로는 약 ${won(R.min * R.qty)}~${won(R.max * R.qty)}이에요. `) + it.fact;
@@ -813,7 +817,7 @@ let audioCtx = null;
 function beep(type) {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const notes = { win: [523, 659, 784, 1046], lose: [392, 330, 262], alert: [880, 660, 880, 660], click: [660], clue: [784, 988, 1175], open: [523, 784], drum: [131, 147, 131, 147, 131, 147, 131, 147, 131, 147, 175, 196] }[type] || [440];
+    const notes = { win: [523, 659, 784, 1046], lose: [392, 330, 262], alert: [880, 660, 880, 660], click: [660], clue: [784, 988, 1175], open: [523, 784], drum: [131, 147, 131, 147, 131, 147, 175, 196] }[type] || [440];
     notes.forEach((f, i) => {
       const o = audioCtx.createOscillator(), g = audioCtx.createGain();
       o.type = 'square'; o.frequency.value = f;
@@ -1555,9 +1559,9 @@ function playReveal(rows, R, after) {
   $('rv-skip').onclick = finishAll;
   $('rv-next').onclick = () => { closeModal(); after(); };
   order.forEach((r, i) => later(() => { beep('open'); openOne(r, els[i], true); }, 500 + i * 900));
-  const t = 500 + order.length * 900;
+  const t = 500 + (order.length - 1) * 900 + 650;   // 마지막 점수가 다 올라가자마자 북소리
   later(() => { $('rv-final').textContent = '낙찰자는… 🥁'; beep('drum'); }, t);
-  later(() => { done = true; beep(top.k === 'me' ? 'win' : 'lose'); finale(); }, t + 1400);
+  later(() => { done = true; beep(top.k === 'me' ? 'win' : 'lose'); finale(); }, t + 600);   // 북소리 뒤 0.6초 만에 낙찰자 발표
 }
 /* =============================================================
    ⑭ [조아의 분석]  왜 이겼는지 / 왜 졌는지 쉽게 설명해요
