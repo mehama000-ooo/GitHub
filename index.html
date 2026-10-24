@@ -272,7 +272,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v4.1</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v4.2</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -1724,7 +1724,7 @@ const MINIS = {
     fact: '분리배출은 종이·플라스틱·캔·유리를 나눠요. 공공기관은 법에 따라 <b>친환경(녹색) 제품</b>을 우선 사야 해요.', play: playRecycle },
   prTeam:  { title: '📣 홍보 포스터 짝 맞추기', how: '카드를 두 장씩 뒤집어서 <b class="gold">같은 그림</b>을 찾아요. 적게 뒤집을수록 좋아요!',
     fact: '나라장터에서 납품한 기록은 다음 입찰 때 <b>납품 실적</b>으로 쓸 수 있어요. 꾸준한 실적이 신뢰가 돼요.', play: playMemory },
-  lab:     { title: '🧪 신기술 물약 실험', how: '물약 4개 중 <b class="gold">3개를 맞는 순서</b>로 넣어요. 결과 힌트를 보고 5번 안에 맞혀요! 💡 힌트 버튼은 딱 한 번 (대신 실험 1번 써요)',
+  lab:     { title: '🧪 신기술 물약 실험', how: '물약 4개 중 <b class="gold">3개를 맞는 순서</b>로 넣어요. 결과 힌트를 보고 5번(🐣 쉬움은 6번) 안에 맞혀요! 💡 힌트 버튼은 딱 한 번 (대신 실험 1번 써요)',
     fact: '조달청은 새로운 기술 제품을 <b>혁신제품</b>으로 지정해서 공공기관이 먼저 써 볼 수 있게 해요.', play: playPotion },
   robot:   { title: '⚙️ 불량품 골라내기', how: '벨트 위로 물건이 지나가요. <b class="bad">기울어지고 금 간 불량품</b>만 클릭! 좋은 물건을 누르면 감점! ⚡ 잡을수록 벨트가 빨라져요!',
     fact: '불량품을 미리 걸러내면 다시 만드는 비용이 줄어서 <b>원가</b>가 낮아져요.', play: playDefect },
@@ -1888,6 +1888,7 @@ function playMemory(area, end) {
 function playPotion(area, end) {
   const cols = [['🔴', '빨강'], ['🟢', '초록'], ['🔵', '파랑'], ['🟡', '노랑']];
   const secret = shuffle([0, 1, 2, 3]).slice(0, 3);
+  const MAXT = EASY ? 6 : 5;                       // 실험 기회: 🐣 쉬움 6번, 🦁 보통 5번
   let guess = [], tries = 0, hintUsed = false;
   area.innerHTML = `<div style="display:flex;gap:14px;height:100%;padding:10px">
       <div style="flex:1;display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:22px">
@@ -1897,13 +1898,13 @@ function playPotion(area, end) {
       </div>
       <div id="pt-log" style="width:250px;font-size:13px;line-height:1.7;overflow:auto"></div></div>`;
   const slots = () => { $('pt-slots').innerHTML = [0, 1, 2].map(s => `<div style="width:56px;height:56px;border:3px dashed var(--gold);display:flex;align-items:center;justify-content:center;font-size:30px">${guess[s] !== undefined ? cols[guess[s]][0] : (s + 1)}</div>`).join(''); };
-  const hud = () => mgHud(`남은 실험 <b class="gold">${5 - tries}번</b> · 🎯 <b>자리까지 맞음</b> = 색도 자리도 맞아요 · 🔄 <b>색만 맞음</b> = 자리가 달라요`);
+  const hud = () => mgHud(`남은 실험 <b class="gold">${MAXT - tries}번</b> · 🎯 <b>자리까지 맞음</b> = 색도 자리도 맞아요 · 🔄 <b>색만 맞음</b> = 자리가 달라요`);
   slots(); hud();
   area.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { const i = +b.dataset.pt; if (guess.length < 3 && !guess.includes(i)) { guess.push(i); beep('click'); slots(); } });
   $('pt-undo').onclick = () => { guess.pop(); slots(); };
   $('pt-hint').onclick = () => {                     // 💡 힌트: 딱 한 번! 자리 하나의 정답을 알려주는 대신 실험 1번을 써요
     if (hintUsed) return;
-    if (5 - tries <= 1) { mgHud('<b class="bad">남은 실험이 1번뿐이라 힌트를 쓸 수 없어요!</b>'); return; }
+    if (MAXT - tries <= 1) { mgHud('<b class="bad">남은 실험이 1번뿐이라 힌트를 쓸 수 없어요!</b>'); return; }
     hintUsed = true; tries++; beep('clue');
     const s = rint(0, 2);
     $('pt-log').insertAdjacentHTML('beforeend', `<div class="gold">💡 힌트: <b>${s + 1}번</b> 자리는 ${cols[secret[s]][0]} <b>${cols[secret[s]][1]}</b>이에요! (실험 -1)</div>`);
@@ -1917,9 +1918,9 @@ function playPotion(area, end) {
     const colorOnly = guess.filter(g => secret.includes(g)).length - exact;
     $('pt-log').insertAdjacentHTML('beforeend', `<div>${tries}. ${guess.map(g => cols[g][0]).join('')} → 🎯 ${exact} · 🔄 ${colorOnly}</div>`);
     guess = []; slots(); hud();
-    if (exact === 3) { beep('win'); mgHud('<b class="good">🎉 실험 성공! 신기술 발견!</b>'); return mgLater(() => end(tries <= 3 ? 3 : tries <= 4 ? 2 : 1), 900); }
+    if (exact === 3) { beep('win'); mgHud('<b class="good">🎉 실험 성공! 신기술 발견!</b>'); return mgLater(() => end(tries <= MAXT - 2 ? 3 : tries <= MAXT - 1 ? 2 : 1), 900); }
     beep('lose');
-    if (tries >= 5) { $('pt-hint').disabled = true; mgHud(`<b class="bad">실험 끝! 정답은 ${secret.map(s => cols[s][0]).join('')}이었어요.</b>`); mgLater(() => end(1), 1400); }
+    if (tries >= MAXT) { $('pt-hint').disabled = true; mgHud(`<b class="bad">실험 끝! 정답은 ${secret.map(s => cols[s][0]).join('')}이었어요.</b>`); mgLater(() => end(1), 1400); }
   };
 }
 
