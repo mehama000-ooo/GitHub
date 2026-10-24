@@ -119,6 +119,9 @@
   .mode-row { display: flex; gap: 70px; justify-content: center; margin-top: 4px; }
   .mode-card { display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .mode-desc { font-size: 12px; color: var(--muted); }
+  .first-tag { background: var(--gold); color: var(--line); border: 2px solid var(--line); font-size: 12px; padding: 2px 8px; animation: bob 1.2s ease-in-out infinite; }
+  .first-tag.ghost { visibility: hidden; animation: none; }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
   .start-foot { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--muted); }
 
   /* ---------- 공통 2단 레이아웃 ---------- */
@@ -247,11 +250,13 @@
     <p class="subtitle">2050, 나라장터를 지켜라!</p>
     <div class="mode-row">
       <div class="mode-card">
+        <span class="first-tag ghost" aria-hidden="true">👋 처음이라면 여기부터!</span>
         <canvas class="sprite" data-sprite="company" data-scale="6"></canvas>
         <button class="btn boss big" onclick="startMode('boss')">🏢 사장님 모드</button>
         <span class="mode-desc">작은 스타트업 사장이 되어 공정하게 계약을 따내요</span>
       </div>
       <div class="mode-card">
+        <span class="first-tag">👋 처음이라면 여기부터!</span>
         <canvas class="sprite" data-sprite="office" data-scale="6"></canvas>
         <button class="btn officer big" onclick="startMode('officer')">🏛️ 담당자 모드</button>
         <span class="mode-desc">신입 주무관이 되어 수상한 입찰서를 찾아내요</span>
@@ -265,7 +270,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v3.0</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v3.1</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -365,11 +370,11 @@
    fav: 경쟁 회사가 쓰는 카드 후보 (라운드마다 이 중 1장을 랜덤으로 써요)
    ============================================================= */
 const COMPANIES = {
-  slow:   { name: '느림보 공방', emoji: '🐢', tint: '#a8794e', quality: 5, speed: 1, eco: 0, priceMul: 1.10, fav: ['quality', 'track', 'innov'], line: '좋은 물건은 시간이 걸리는 법이죠.' },
-  fast:   { name: '번개 물산',   emoji: '⚡', tint: '#e8c33b', quality: 3, speed: 5, eco: 0, priceMul: 1.00, fav: ['speed', 'cut', 'track'], line: '내일 바로 보내드립니다!' },
-  green:  { name: '초록 리빙',   emoji: '🌱', tint: '#5fae57', quality: 4, speed: 3, eco: 1, priceMul: 1.08, fav: ['eco', 'quality', 'innov'], line: '지구도 함께 생각했어요.' },
-  cheap:  { name: '알뜰 상사',   emoji: '💰', tint: '#b7b7c9', quality: 2, speed: 3, eco: 0, priceMul: 0.85, fav: ['cut', 'track', 'speed'], line: '싼 게 최고 아닙니까?' },
-  black:  { name: '블랙 컴퍼니', emoji: '🕶️', tint: '#2b2b38', quality: 3, speed: 3, eco: 0, priceMul: 0.80, fav: ['cut', 'track'], line: '…….' },
+  slow:   { name: '느림보 공방', emoji: '🐢', tint: '#a8794e', quality: 5, speed: 1, eco: 0, priceMul: 1.10, fav: ['quality', 'track', 'innov'], line: '좋은 물건은 시간이 걸리는 법이죠.', strong: '품질 최고! 대신 느려요' },
+  fast:   { name: '번개 물산',   emoji: '⚡', tint: '#e8c33b', quality: 3, speed: 5, eco: 0, priceMul: 1.00, fav: ['speed', 'cut', 'track'], line: '내일 바로 보내드립니다!', strong: '배달이 아주 빨라요' },
+  green:  { name: '초록 리빙',   emoji: '🌱', tint: '#5fae57', quality: 4, speed: 3, eco: 1, priceMul: 1.08, fav: ['eco', 'quality', 'innov'], line: '지구도 함께 생각했어요.', strong: '품질 좋고 🌿친환경 (비싼 편)' },
+  cheap:  { name: '알뜰 상사',   emoji: '💰', tint: '#b7b7c9', quality: 2, speed: 3, eco: 0, priceMul: 0.85, fav: ['cut', 'track', 'speed'], line: '싼 게 최고 아닙니까?', strong: '제일 싸요 (품질은 낮아요)' },
+  black:  { name: '블랙 컴퍼니', emoji: '🕶️', tint: '#2b2b38', quality: 3, speed: 3, eco: 0, priceMul: 0.80, fav: ['cut', 'track'], line: '…….', strong: '정체불명! 가격이 수상해요' },
   friend: { name: '친구네 상사', emoji: '🤝', tint: '#d77fa1', quality: 3, speed: 3, eco: 0, priceMul: 1.70, line: '야, 우리 사이에 이번 한 번만!' },
 };
 const MY_COMPANY = { name: '우리 회사', emoji: '🚀' };
@@ -1172,6 +1177,7 @@ function newsIntro(R, n, after) {
 const COACH = {
   boss: [
     { el: '#b-req',      text: '📋 <b>요청서</b>예요. 뭘 사는지, <b class="gold">특별 조건</b>과 <b class="gold">심사 기준 ●●●</b>을 봐요.' },
+    { el: '#b-rivals',   text: () => `⚔️ <b>경쟁 회사</b>예요. 회사마다 잘하는 게 달라요!<br>${bossRivals().map(k => `${COMPANIES[k].emoji} <b>${COMPANIES[k].name}</b>: ${COMPANIES[k].strong}`).join('<br>')}<br>💡 이 회사들보다 <b class="gold">●●● 기준</b>에서 앞서야 이겨요!` },
     { el: '#b-hand',     text: '🃏 <b>카드 2장</b>을 골라요. ●●●(아주 중요)에 맞는 카드가 좋아요!' },
     { el: '.pricebox',   text: '💰 <b>가격</b>을 정해요. 싸면 이기기 쉽지만 남는 돈이 줄어요.' },
     { el: '#b-submit',   text: '📨 다 됐으면 <b>입찰하기!</b> 궁금하면 언제든 ❓도움말을 눌러요.' },
@@ -1184,8 +1190,9 @@ const COACH = {
     { el: '#o-bids .acts', text: '수상하면 🚨<b>신고</b>, 제일 좋은 곳은 ✅<b>계약</b>! 궁금하면 ❓도움말을 눌러요.' },
   ],
 };
-function tutorialDone(mode) { try { return localStorage.getItem('naraTut_' + mode) === '1'; } catch (e) { return false; } }
-function markTutorial(mode) { try { localStorage.setItem('naraTut_' + mode, '1'); } catch (e) {} }
+const TUT_KEY = mode => 'naraTut_' + mode + (mode === 'boss' ? '2' : '');   // 사장님 튜토리얼이 바뀌어서(경쟁 회사 설명) 한 번 더 보여줘요
+function tutorialDone(mode) { try { return localStorage.getItem(TUT_KEY(mode)) === '1'; } catch (e) { return false; } }
+function markTutorial(mode) { try { localStorage.setItem(TUT_KEY(mode), '1'); } catch (e) {} }
 function runCoach(steps, done) {
   const game = $('game');
   const scale = game.getBoundingClientRect().width / game.offsetWidth;
@@ -1205,7 +1212,7 @@ function runCoach(steps, done) {
     ov.innerHTML = `
       <div style="position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:3px solid var(--gold);box-shadow:0 0 0 2000px #070816c4;pointer-events:none"></div>
       <div class="box" style="position:absolute;left:${bx}px;${below ? `top:${y + h + 10}px` : `top:${Math.max(10, y - 110)}px`};width:370px;background:var(--panel);border-color:var(--gold);display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.5">
-        <div>${steps[i].text}</div>
+        <div>${typeof steps[i].text === 'function' ? steps[i].text() : steps[i].text}</div>
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span class="muted" style="font-size:12px">${i + 1} / ${steps.length}</span>
           <span style="display:flex;gap:6px"><button class="btn ghost sm" id="co-skip">건너뛰기</button>
