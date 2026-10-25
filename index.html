@@ -272,7 +272,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v4.4</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v4.5</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -1972,10 +1972,11 @@ function playDefect(area, end) {
 
 function showShop(after) {
   const R = BOSS_ROUNDS[G.round];
-  let boughtNow = null;                                    // 투자 시간마다 딱 1개만 살 수 있어요
+  const SHOP_MAX = 2;                                      // 투자 시간마다 2개까지 살 수 있어요
+  const boughtNow = [];
   const draw = () => {
     openModal(`<h2>🏭 회사 투자 시간</h2>
-      <p style="font-size:13px">{이름}, 번 돈으로 회사를 키워요! <b class="gold">한 번에 1개만</b> 살 수 있고, 산 시설은 <b class="gold">남은 라운드 내내</b> 효과가 있어요. 🎮 투자하면 <b class="gold">미니게임</b>! 잘하면 최대 30% 할인. <span class="muted">(쓴 돈은 엔딩의 "번 돈"에서 빠지고, 자금은 100만원 넘게 남겨야 해요)</span></p>
+      <p style="font-size:13px">{이름}, 번 돈으로 회사를 키워요! <b class="gold">한 번에 2개까지</b> 살 수 있고, 산 시설은 <b class="gold">남은 라운드 내내</b> 효과가 있어요. 🎮 투자하면 <b class="gold">미니게임</b>! 잘하면 최대 30% 할인. <span class="muted">(쓴 돈은 엔딩의 "번 돈"에서 빠지고, 자금은 100만원 넘게 남겨야 해요)</span></p>
       <div class="tip" style="font-size:13px;display:flex;justify-content:space-between;gap:10px;padding:6px 10px">
         <span>📋 다음: <b>${R.item}</b>${R.emergency ? ' — 🚨 긴급 계약' : ' — 중요: <b class="gold">' + topCriteria(R.w) + '</b>' + (secondCriteria(R.w) ? ' · ' + secondCriteria(R.w) : '')}${R.cond ? ' · <b class="bad">' + CONDS[R.cond].label + '</b>' : ''}</span>
         <span style="white-space:nowrap">💰 <b class="gold num">${won(G.money)}</b></span>
@@ -1983,20 +1984,20 @@ function showShop(after) {
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
         ${Object.entries(UPGRADES).map(([k, u]) => {
           const own = G.upgrades.includes(k), poor = G.money - u.cost < 1000000;   // 최소 100만원은 남겨둬요
-          const locked = boughtNow && !own;                                          // 이번에 이미 1개 샀어요
+          const locked = boughtNow.length >= SHOP_MAX && !own;                       // 이번에 이미 2개 샀어요
           return `<div class="box" style="display:flex;flex-direction:column;gap:3px;padding:6px 9px;${own ? 'border-color:var(--gold);background:#f6c94522' : ''}">
             <div style="font-size:15px">${u.icon} ${u.name}</div>
             <div style="font-size:12px;line-height:1.4;flex:1">${u.ds}</div>
             <button class="btn sm ${own ? 'ghost' : 'boss'}" data-up="${k}" ${own || poor || locked ? 'disabled' : ''}>
-              ${k === boughtNow ? '🎉 이번에 샀어요' : own ? '✅ 보유 중' : locked ? '🔒 다음 투자 때' : poor ? '💸 돈 부족 (' + won(u.cost) + ')' : won(u.cost) + ' 투자'}</button>
+              ${boughtNow.includes(k) ? '🎉 이번에 샀어요' : own ? '✅ 보유 중' : locked ? '🔒 다음 투자 때' : poor ? '💸 돈 부족 (' + won(u.cost) + ')' : won(u.cost) + ' 투자'}</button>
           </div>`; }).join('')}
       </div>
-      <div class="modal-acts"><button class="btn" id="shop-go">${boughtNow ? '다음 라운드로 →' : '투자 안 하고 넘어가기 →'}</button></div>`);
+      <div class="modal-acts"><span class="muted" style="margin-right:auto;font-size:12px;align-self:center">이번 투자: <b class="gold">${boughtNow.length}</b>/${SHOP_MAX}개</span><button class="btn" id="shop-go">${boughtNow.length ? '다음 라운드로 →' : '투자 안 하고 넘어가기 →'}</button></div>`);
     $('modal-box').querySelectorAll('[data-up]').forEach(btn => btn.onclick = () => {
       const k = btn.dataset.up, u = UPGRADES[k];
-      if (boughtNow || G.upgrades.includes(k) || G.money - u.cost < 1000000) return;
+      if (boughtNow.length >= SHOP_MAX || G.upgrades.includes(k) || G.money - u.cost < 1000000) return;
       runMini(k, cost => {                                   // 🎮 미니게임 결과로 투자비가 정해져요
-        G.money -= cost; G.invested += cost; G.upgrades.push(k); boughtNow = k;
+        G.money -= cost; G.invested += cost; G.upgrades.push(k); boughtNow.push(k);
         $('b-money').textContent = won(G.money);
         draw();
       });
