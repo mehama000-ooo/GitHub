@@ -272,7 +272,7 @@
       <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v4.5</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v4.6</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -339,7 +339,7 @@
         <button class="btn officer" id="o-analyze" onclick="officerAnalyze()">🤖 조아에게 분석 맡기기</button>
       </div>
       <div class="col">
-        <div class="label">🔍 돋보기 <b id="o-lens" class="gold">3</b>개 · 📄서류에서 수상한 칸을 눌러 <b>증거</b>를 찾고 🚨신고! 가성비 1등은 ✅계약!</div>
+        <div class="label">🔍 돋보기 <b id="o-lens" class="gold">5</b>개 · 📄서류에서 수상한 칸을 눌러 <b>증거</b>를 찾고 🚨신고! 가성비 1등은 ✅계약!</div>
         <div class="bids" id="o-bids"></div>
       </div>
     </div>
@@ -935,7 +935,7 @@ const HOWTO = {
     <table class="tbl" style="text-align:left">
       <tr><td><b class="gold">1</b></td><td style="text-align:left">📋 <b>요청서</b>에서 물건, 실제 가격, ⚠️특별 조건, 📌심사 기준(●●●)을 봐요.</td></tr>
       <tr><td><b class="gold">2</b></td><td style="text-align:left">📨 입찰서를 비교해서 <b>가성비가 제일 좋은 회사</b>를 찾아요. 제일 싼 곳이 정답은 아니에요!</td></tr>
-      <tr><td><b class="gold">3</b></td><td style="text-align:left">📄 <b>서류</b>를 열고 수상한 칸을 눌러 🔍<b>증거</b>를 찾아요. 돋보기는 <b class="gold">라운드마다 3개!</b> 증거와 함께 신고하면 +5점.</td></tr>
+      <tr><td><b class="gold">3</b></td><td style="text-align:left">📄 <b>서류</b>를 열고 수상한 칸을 눌러 🔍<b>증거</b>를 찾아요. 돋보기는 <b class="gold">라운드마다 5개 (🐣 쉬움 7개)!</b> 증거와 함께 신고하면 +5점.</td></tr>
       <tr><td><b class="gold">4</b></td><td style="text-align:left">🤖 <b>조아</b>는 실제 가격과 비교해 줘요. <b class="gold">게임 전체 3번!</b></td></tr>
       <tr><td><b class="gold">5</b></td><td style="text-align:left">🚨 반칙한 회사는 <b>신고</b>(단서 획득!), 제일 좋은 회사와 ✅<b>계약</b>. 억울한 신고는 감점이에요.</td></tr>
       <tr><td><b class="gold">6</b></td><td style="text-align:left">⏱️ 재난 라운드는 <b>30초 안에</b> 골라야 해요!</td></tr>
@@ -1194,7 +1194,7 @@ const COACH = {
   officer: [
     { el: '#o-req',      text: '📋 <b>요청서</b>예요. 뭘 사는지, 실제 가격이 얼마인지 봐요.' },
     { el: '#o-bids',     text: '📨 회사들이 낸 <b>입찰서</b>예요. ●●● 기준으로 <b>가성비가 제일 좋은 곳</b>을 찾아요.' },
-    { el: '#o-bids .doc-btn', text: '📄 <b>서류</b>를 열고 수상한 칸을 누르면 🔍<b>돋보기</b>로 증거를 찾아요. 라운드마다 3개!' },
+    { el: '#o-bids .doc-btn', text: () => `📄 <b>서류</b>를 열고 수상한 칸을 누르면 🔍<b>돋보기</b>로 증거를 찾아요. 라운드마다 ${EASY ? 7 : 5}개!` },
     { el: '#o-analyze',  text: '🤖 <b>조아</b>는 실제 가격과 비교해 줘요. 게임 전체에서 3번만!' },
     { el: '#o-bids .acts', text: '수상하면 🚨<b>신고</b>, 제일 좋은 곳은 ✅<b>계약</b>! 궁금하면 ❓도움말을 눌러요.' },
   ],
@@ -2118,7 +2118,7 @@ function stopTimer() { if (G && G.timerId) { clearInterval(G.timerId); G.timerId
 function officerRound() {
   const R = OFFICER_ROUNDS[G.round];
   G.reported = new Set(); G.wrongReports = 0; G.analyzed = false; G.roundOver = false;
-  G.lens = EASY ? 5 : 3; G.evidence = new Map(); G.checked = new Set(); G.evReports = 0; $('o-lens').textContent = G.lens;
+  G.lens = EASY ? 7 : 5; G.evidence = new Map(); G.checked = new Set(); G.evReports = 0; $('o-lens').textContent = G.lens;   // 🔍 돋보기: 🐣 쉬움 7개, 🦁 보통 5개 (라운드마다)
   stopTimer();
   $('o-round').textContent = G.step + 1;
   $('o-saved').textContent = won(G.saved);
