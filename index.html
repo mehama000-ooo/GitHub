@@ -214,7 +214,7 @@
   .doc-tbl tr.ev:hover td, .doc-tbl tr.ev:hover th { background: #f6c94533; }
   .doc-tbl tr.found td, .doc-tbl tr.found th { background: #e5484d40; }
   .doc-tbl tr.clean td { color: var(--muted); }
-  .doc-tbl .note { font-size: 12px; display: block; margin-top: 2px; }
+  .doc-tbl .note { font-size: 12px; display: block; margin-top: 7px; }
   .ev-stamp { display: inline-block; background: var(--bad); color: var(--text); border: 2px solid var(--line); padding: 1px 6px; font-size: 12px; transform: rotate(-6deg); animation: stamp .35s ease-out; }
   @keyframes stamp { 0% { transform: scale(2.4) rotate(-20deg); opacity: 0; } 100% { transform: scale(1) rotate(-6deg); opacity: 1; } }
   .tempt-art { font-size: 40px; text-align: center; line-height: 52px; height: 52px; margin-bottom: 4px; }
@@ -284,14 +284,15 @@
       </div>
     </div>
     <div class="start-foot">
-      <span>🧩 블랙 컴퍼니 단서 <b class="gold" id="start-clues">0</b>/5</span>
+      <span>🧩 블랙 컴퍼니 단서 <b class="gold" id="start-clues">0</b>/5<span id="start-s2" hidden> · 📗 시즌 2 <b class="gold" id="start-clues2">0</b>/5</span></span>
       <button class="btn sm" onclick="showHowTo('all')">🎮 게임 방법</button>
       <button class="btn sm ghost" onclick="showStory()">📖 이야기</button>
       <button class="btn sm ghost" onclick="showGlossary()">📚 용어 사전</button>
-      <button class="btn sm ghost" id="start-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
+      <button class="btn sm ghost" id="start-true" onclick="showTrueEnding(1)" hidden>⭐ 진엔딩 보기</button>
+      <button class="btn sm ghost" id="start-true2" onclick="showTrueEnding(2)" hidden>⭐ 시즌 2 엔딩</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v5.0</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v6.0</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -375,7 +376,7 @@
     <div style="display:flex;gap:10px">
       <button class="btn" id="res-retry">다시 하기</button>
       <button class="btn ghost" onclick="showScreen('start')">처음으로</button>
-      <button class="btn green" id="res-true" onclick="showTrueEnding()" hidden>⭐ 진엔딩 보기</button>
+      <button class="btn green" id="res-true" onclick="showTrueEnding(S2 ? 2 : 1)" hidden>⭐ 진엔딩 보기</button>
     </div>
   </section>
 
@@ -602,8 +603,10 @@ function buildBossRounds() {
       crit = bestTry.crit; R.w = crit.w; R.hint = bestTry.pair; R.hintPrice = bestTry.price;
     }
     R.news = (it.news || `${R.who}, ${R.item} ${R.qty.toLocaleString()}${R.unit} 구매 입찰 공고`) + (sl.newsTail || '');
+    if (S2) R.news = R.news.split('정체불명의 "블랙 컴퍼니"').join('이름을 바꾼 "그림자 상사"');
     // 조아 말은 짧게! 물건 이름은 요청서에 있으니 빼고, 기준·조건·사건만 말해요
     R.joa = (it.joa || `{이름}, ${si === 0 ? '첫 입찰! ' : si === 4 ? '마지막 큰 계약! ' : ''}${EASY ? crit.short : crit.mid}`) + (R.cond ? ' ' + CONDS[R.cond].joa : '') + (sl.joaTail || '');
+    if (S2) R.joa = R.joa.split('블랙 컴퍼니가 처음 나타났어요').join('그림자 상사가 나타났어요').split('블랙 컴퍼니에서').join('그림자 상사에서');
     R.real = R.future ? `2050년 미래 사업이라 상상한 금액이에요. ${it.fact}`
       : (R.min === R.max ? `실제로는 1${R.unit}에 ${unitPrice(R.min)}, ${R.qty.toLocaleString()}${R.unit}이면 약 ${won(R.min * R.qty)}이에요. `
                          : `${R.qty.toLocaleString()}${R.unit}이면 실제로는 약 ${won(R.min * R.qty)}~${won(R.max * R.qty)}이에요. `) + it.fact;
@@ -632,13 +635,24 @@ const O_SUSPECTS = [            // 라운드별로 숨길 수 있는 수상한 �
   [['friend'], ['friend', 'low']],
   [['black'], ['black', 'inflate'], ['black', 'collude']],
 ];
+const O_SUSPECTS_S2 = [         // 📗 시즌 2: 새 반칙 split 계약 쪼개기 / fakeinv 가짜 혁신제품 / rename 이름만 바꾼 회사
+  [['split'], ['fakeinv'], [], ['low']],
+  [['split'], ['fakeinv'], ['rename'], ['split', 'collude']],
+  [['fakeinv'], ['rename'], ['split', 'low'], ['fakeinv', 'collude']],
+  [['friend'], ['friend', 'split'], ['friend', 'fakeinv']],
+  [['rename'], ['rename', 'split'], ['rename', 'fakeinv']],
+];
+const BANNED_NAMES = ['구본철', '마석진', '변영호', '탁무열', '표강수', '도한결'];   // ⛔ 입찰 참가 제한 대표 (보통 회사 대표 이름과 안 겹쳐요)
+const ALIAS_NAMES = [['새빛 상사', '🌅'], ['하늘마루', '☁️'], ['바른손 물산', '✋'], ['푸른나래', '🕊️']];   // 🎭 이름만 바꾼 회사의 새 이름
 const CEO_NAMES = ['김하늘', '이도윤', '박서연', '최민준', '정지우', '강하은', '조은우', '윤서진', '장태양', '한별'];
 const ADDRS = ['하늘시 구름로 12', '바다시 파도길 7', '푸른시 숲속로 33', '별빛구 은하로 5', '미래시 내일로 88', '새싹구 봄길 21', '햇살시 아침로 9'];
 function rint(a, b) { return Math.floor(a + Math.random() * (b - a + 1)); }
 function phone() { return `0${rint(2, 6)}-${rint(200, 999)}-${rint(1000, 9999)}`; }
 function makeDoc(bid) {
   return { ceo: pick(CEO_NAMES), founded: `${rint(2031, 2046)}년 ${rint(1, 12)}월`, addr: pick(ADDRS), tel: phone(),
-    records: rint(8, 60), certs: [bid.eco ? `🌿 친환경 인증 (번호 ECO-${rint(1000, 9999)})` : null, bid.innov ? `💡 혁신제품 지정 (번호 INV-${rint(1000, 9999)})` : null].filter(Boolean) };
+    records: rint(8, 60), way: '한 번에 계약 (경쟁 입찰)',
+    certs: [bid.eco ? `🌿 친환경 인증 (번호 ECO-${rint(1000, 9999)})` : null,
+      bid.innov ? `💡 혁신제품 지정 (번호 INV-${rint(1000, 9999)}${S2 ? ` · ${rint(2051, 2053)}년 ${rint(1, 12)}월까지` : ''})` : null].filter(Boolean) };   // 📗 시즌 2는 혁신제품 기간이 보여요
 }
 function valueParts(b, R) {     // 항목별 가성비 점수 (기관의 중요도 ●●● 를 곱한 값)
   const w = R.w, hi = R.budget || R.max, lo = R.min * 0.6;
@@ -671,7 +685,7 @@ function buildOfficerRounds() {
     R.budget = R.cond === 'budget' ? Math.max(Math.round(R.min * 1.1), Math.round(R.max * CONDS.budget.cut)) : R.max;
     condFix(R.w, R.cond);
     R.news = it.news || `${R.who}, ${R.item} ${R.qty.toLocaleString()}${R.unit} 구매 입찰 공고`;
-    R.joa = O_JOA[si] + (crit ? ' ' + (EASY ? crit.short : crit.mid) : '') + (R.cond ? ' ' + CONDS[R.cond].joa : '');
+    R.joa = (S2 && si === 4 ? '마지막 큰 사업이에요. 그림자 상사가 이름을 바꿔 숨어 있대요…' : O_JOA[si]) + (crit ? ' ' + (EASY ? crit.short : crit.mid) : '') + (R.cond ? ' ' + CONDS[R.cond].joa : '');
     R.real = R.future ? `2050년 미래 사업이라 상상한 금액이에요. 가장 싼 곳이 아니라 믿을 수 있는 곳을 고르는 게 진짜 아끼는 거예요.`
       : (R.min === R.max ? `실제로는 1${R.unit}에 ${unitPrice(R.min)}, ${R.qty.toLocaleString()}${R.unit}이면 약 ${won(R.min * R.qty)}이에요. `
                          : `${R.qty.toLocaleString()}${R.unit}이면 실제로는 약 ${won(R.min * R.qty)}~${won(R.max * R.qty)}이에요. `) + it.fact;
@@ -690,7 +704,10 @@ function buildOfficerRounds() {
     if (si === 0) bids = bids.slice(0, 3);                            // 첫 라운드는 3장만
     // --- 수상한 입찰서 숨기기 ---
     const free = () => bids.filter(b => !b.flag);
-    (EASY && si === 0 ? ['low'] : EASY && si === 2 ? ['collude'] : pick(O_SUSPECTS[si])).forEach(type => {   // 🐣 쉬움: 단서 1·2를 꼭 얻을 수 있게
+    if (S2) R.banned = shuffle(BANNED_NAMES).slice(0, HARD ? 3 : 2);   // ⛔ 입찰 참가 제한 명단
+    const plan = S2 ? (EASY && si === 0 ? ['split'] : EASY && si === 2 ? ['fakeinv'] : pick(O_SUSPECTS_S2[si]))
+      : (EASY && si === 0 ? ['low'] : EASY && si === 2 ? ['collude'] : pick(O_SUSPECTS[si]));   // 🐣 쉬움: 단서를 꼭 얻을 수 있게
+    plan.forEach(type => {
       if (type === 'low') {
         const b = free().find(x => x.co === 'cheap') || pick(free());
         Object.assign(b, { flag: 'low', price: roundPrice(R.min * (HARD ? rand(0.5, 0.57) : rand(0.35, 0.5))), quality: Math.max(b.quality, 4) });   // 🔥어려움: 덜 티 나게 싸요
@@ -711,6 +728,21 @@ function buildOfficerRounds() {
         const b = pick(free());
         Object.assign(b, { co: 'friend', flag: 'friend', price: roundPrice(R.max * rand(1.3, 1.5)), quality: 3, speed: 3, eco: 0, track: 0, innov: 0 });
         b.doc = makeDoc(b); b.doc.ceo = '박친구 (내 친구)';
+      } else if (type === 'split') {                                // ✂️ 계약 쪼개기: 경쟁을 피하려고 나눠서 수의계약하자고 해요
+        const b = pick(free());
+        Object.assign(b, { flag: 'split', price: roundPrice(R.base * rand(0.88, 0.95)), quality: Math.max(b.quality, 4) });
+        b.doc = makeDoc(b); b.doc.way = HARD ? '2번으로 나눠 계약 (두 번째는 수의계약)' : '3번으로 나눠 계약 (경쟁 없이 수의계약으로)';
+      } else if (type === 'fakeinv') {                              // 💡 가짜 혁신제품: 지정 기간이 이미 끝났어요
+        const b = pick(free());
+        Object.assign(b, { flag: 'fakeinv', price: roundPrice(R.base * rand(0.9, 1.0)), quality: Math.max(b.quality, 4), innov: 1 });
+        b.doc = makeDoc(b);
+        b.until = HARD ? '2050년 9월' : `2049년 ${rint(1, 12)}월`;
+        b.doc.certs = b.doc.certs.filter(c => !c.startsWith('💡')).concat(`💡 혁신제품 지정 (번호 INV-${rint(1000, 9999)} · ${b.until}까지)`);
+      } else if (type === 'rename') {                               // 🎭 이름만 바꾼 회사: 대표가 입찰 제한 명단에 있어요
+        const b = pick(free());
+        const [an, ae] = pick(ALIAS_NAMES);
+        Object.assign(b, { flag: 'rename', alias: { name: an, emoji: ae }, price: roundPrice(R.base * rand(0.86, 0.94)), quality: Math.max(b.quality, 4), track: 1 });
+        b.doc = makeDoc(b); b.doc.ceo = R.banned[0]; b.doc.founded = HARD ? `${rint(2046, 2049)}년 ${rint(1, 12)}월` : '2050년 8월'; b.doc.records = rint(3, 9);
       } else if (type === 'black') {
         const b = pick(free());
         Object.assign(b, { co: 'black', flag: 'black', price: roundPrice(R.min * rand(0.6, 0.7)), quality: 5, speed: 5, eco: 1, track: 1, innov: 1 });
@@ -760,6 +792,15 @@ const ENDINGS = {
     poorDishon:  { name: '📉 감사 대상', text: '세금이 줄줄 샜어요. 감사를 받게 됐어요.', sprite: 'black' },
   },
 };
+/* 📗 시즌 2 "블랙 컴퍼니의 반격" 단서 5개 */
+const CLUES2 = {
+  1: '쪼개진 계약서들에 모두 같은 도장이 찍혀 있다.',
+  2: '가짜 혁신제품 인증서가 모두 같은 인쇄소에서 나왔다.',
+  3: '재난 때 바가지를 부추긴 문자가 "그림자"라는 이름으로 왔다.',
+  4: '그림자 상사의 제안서에 블랙 컴퍼니 옛 대표의 사인이 있다.',
+  5: '이름만 바꾼 회사의 대표가 입찰 제한 명단에 있다.',
+};
+const S2_ENDING = '블랙 컴퍼니는 이름을 바꾸고, 계약을 쪼개고, 가짜 인증서를 만들어 다시 돌아왔어요. 하지만 날짜 하나, 이름 하나까지 꼼꼼히 확인하는 눈 앞에서는 숨을 수 없었어요.';
 const TRUE_ENDING = '블랙 컴퍼니는 한 회사가 아니었어요. "이번 한 번쯤은 괜찮겠지" 하던 작은 반칙들이 모여서 생긴 거였어요. 공정한 선택이 모이면, 블랙 컴퍼니는 사라져요.';
 
 /* =============================================================
@@ -804,6 +845,7 @@ function paintSprite(canvas) {
    ============================================================= */
 const $ = id => document.getElementById(id);
 var EASY = false;                                 // 🐣 쉬움 모드인지 (var라서 어디서든 바로 쓸 수 있어요)
+var S2 = false;                                   // 📗 시즌 2 "블랙 컴퍼니의 반격"인지 (진엔딩을 보면 열려요)
 var HARD = false;                                 // 🔥 어려움 모드인지 (진엔딩을 보면 열려요)
 function unitPrice(n) {
   n = Math.round(n);
@@ -876,17 +918,20 @@ if (window.visualViewport) window.visualViewport.addEventListener('resize', fit)
 /* =============================================================
    단서 기록 (브라우저에 저장돼서 두 모드가 이어져요)
    ============================================================= */
-let clues = new Set();
+let clues = new Set(), clues2 = new Set();      // clues2 = 📗 시즌 2 단서
 try { clues = new Set(JSON.parse(localStorage.getItem('naraClues') || '[]')); } catch (e) {}
-function saveClues() { try { localStorage.setItem('naraClues', JSON.stringify([...clues])); } catch (e) {} }
-function addClue(n) {
-  if (!n || clues.has(n)) return '';
-  clues.add(n); saveClues(); beep('clue'); updateClueCount();
-  return `<div class="clue-get">🧩 <b class="gold">블랙 컴퍼니 단서 ${n} 획득!</b><br>${CLUES[n]}</div>`;
+try { clues2 = new Set(JSON.parse(localStorage.getItem('naraClues2') || '[]')); } catch (e) {}
+function saveClues() { try { localStorage.setItem('naraClues', JSON.stringify([...clues])); localStorage.setItem('naraClues2', JSON.stringify([...clues2])); } catch (e) {} }
+function addClue(n) {                            // 지금 시즌의 단서를 얻어요
+  const set = S2 ? clues2 : clues;
+  if (!n || set.has(n)) return '';
+  set.add(n); saveClues(); beep('clue'); updateClueCount();
+  return `<div class="clue-get">🧩 <b class="gold">${S2 ? '📗 시즌 2 단서' : '블랙 컴퍼니 단서'} ${n} 획득!</b><br>${(S2 ? CLUES2 : CLUES)[n]}</div>`;
 }
-function updateClueCount() { document.querySelectorAll('.clue-count').forEach(e => e.textContent = clues.size); }
+function updateClueCount() { document.querySelectorAll('.clue-count').forEach(e => e.textContent = (S2 ? clues2 : clues).size); }
 function refreshStart() {
   $('start-clues').textContent = clues.size; $('start-true').hidden = clues.size < 5; updateClueCount();
+  $('start-s2').hidden = !hardUnlocked(); $('start-clues2').textContent = clues2.size; $('start-true2').hidden = clues2.size < 5;
   const t = myTitle();
   $('start-title').hidden = !t;
   if (t) $('start-title').textContent = `${t.icon} 칭호: ${t.name}${PLAYER.nick ? ' · ' + PLAYER.nick : ''}`;
@@ -894,7 +939,7 @@ function refreshStart() {
 function resetRecord() {
   openModal(`<h2>기록 초기화</h2><p>모은 단서를 모두 지울까요? (튜토리얼도 다시 나와요)</p>
     <div class="modal-acts"><button class="btn ghost" onclick="closeModal()">취소</button>
-    <button class="btn red" onclick="clues=new Set();saveClues();try{localStorage.removeItem('naraTut_boss');localStorage.removeItem('naraTut_officer')}catch(e){};closeModal();refreshStart()">지우기</button></div>`);
+    <button class="btn red" onclick="clues=new Set();clues2=new Set();saveClues();try{localStorage.removeItem('naraTut_boss');localStorage.removeItem('naraTut_officer')}catch(e){};closeModal();refreshStart()">지우기</button></div>`);
 }
 function showStory() {
   openModal(`<h2>📖 2050, 나라장터를 지켜라</h2>
@@ -982,10 +1027,12 @@ function showHowTo(mode, after) {
 }
 
 /* ⭐ 진엔딩: 오프닝처럼 장면이 넘어가는 이야기 → 칭호 + 🔥어려움 난이도 해금 */
-const TITLES = { guardian: { icon: '🏅', name: '나라장터 수호자' }, gold: { icon: '👑', name: '황금 수호자' } };
+const TITLES = { guardian: { icon: '🏅', name: '나라장터 수호자' }, detective: { icon: '🔍', name: '나라장터 명탐정' }, gold: { icon: '👑', name: '황금 수호자' } };
+const TITLE_RANK = { guardian: 1, detective: 2, gold: 3 };   // 더 높은 칭호를 받으면 바뀌어요
+function giveTitle(k) { try { const cur = localStorage.getItem('naraTitle'); if ((TITLE_RANK[cur] || 0) < TITLE_RANK[k]) localStorage.setItem('naraTitle', k); } catch (e) {} }
 function myTitle() { try { return TITLES[localStorage.getItem('naraTitle')] || null; } catch (e) { return null; } }
 function hardUnlocked() { try { return localStorage.getItem('naraHard') === '1'; } catch (e) { return false; } }
-function tePic(kind) {                              // 장면마다 움직이는 그림
+function tePic(kind, icon) {                        // 장면마다 움직이는 그림
   const box = document.createElement('div'); box.className = 'te-pic';
   if (kind === 'clues') {
     const spots = [[0, -60], [57, -18], [35, 50], [-35, 50], [-57, -18]], from = [[-160, -160], [170, -120], [160, 170], [-170, 160], [-180, 0]];
@@ -1002,31 +1049,43 @@ function tePic(kind) {                              // 장면마다 움직이는
     });
     box.appendChild(grid);
   } else if (kind === 'badge') {
-    box.innerHTML = '<span class="te-badge">🏅</span>';
+    box.innerHTML = `<span class="te-badge">${icon || '🏅'}</span>`;
   } else if (kind === 'me') {
     box.appendChild(makeSprite(PLAYER.gender || 'boy', 13, PALETTE.Y));
+  } else if (kind === 'rename') {                   // 🎭 이름표가 바뀌는 블랙 컴퍼니
+    box.appendChild(makeSprite('black', 11));
+    box.insertAdjacentHTML('beforeend', '<span class="te-pop" style="position:absolute;bottom:14px;background:var(--text);color:var(--line);border:2px solid var(--line);padding:1px 8px;font-size:15px;animation-delay:.6s">🏷️ 그림자 상사</span>');
   } else {
     box.appendChild(makeSprite(kind, 12));
   }
   return box;
 }
-function showTrueEnding() {
+function showTrueEnding(season) {
+  season = season === 2 ? 2 : 1;
   const nm = PLAYER.nick || '플레이어';
-  const scenes = [
+  const scenes = season === 2 ? [
+    { who: 'narr', pic: 'clues', text: '시즌 2 단서 5개를 맞춰 보니… 모든 반칙이 한 곳을 가리켜요.' },
+    { who: 'narr', pic: 'rename', text: '이름만 바꿔 다시 나타난 블랙 컴퍼니, 바로 "그림자 상사"였어요!' },
+    { who: 'narr', pic: 'crack', text: '하지만 나라장터는 이름이 아니라 대표자를 확인해요. 이름을 바꿔도 숨을 수 없었어요!' },
+    { who: 'narr', pic: 'small', text: '그림자 상사가 무너지자, 반칙에 끌려갔던 작은 회사들이 다시 정직하게 경쟁하기 시작했어요.' },
+    { who: 'joa', pic: 'ai', text: `${nm}님은 서류 속 작은 날짜와 이름까지 찾아냈어요. 진짜 명탐정이에요!` },
+    { who: 'me', pic: 'me', text: '이름이 바뀌어도, 반칙은 반칙이다!' },
+    { who: 'narr', pic: 'badge', icon: '🔍', text: `🔍 칭호 획득: "나라장터 명탐정"\n📗 시즌 2 클리어! 축하해요!` },
+  ] : [
     { who: 'narr', pic: 'clues', text: '모은 단서 5개를 하나로 맞춰 보니…' },
     { who: 'narr', pic: 'black', text: '블랙 컴퍼니의 진짜 모습이 드러나기 시작했어요!' },
     { who: 'narr', pic: 'crack', text: '쩌적! 블랙 컴퍼니가 깨지자, 그 안에서 작은 회사들이 쏟아져 나왔어요.' },
     { who: 'narr', pic: 'small', text: '블랙 컴퍼니는 한 회사가 아니었어요. "이번 한 번쯤은 괜찮겠지" 하던 작은 반칙들이 모여서 생긴 거였어요.' },
     { who: 'joa', pic: 'ai', text: `${nm}님의 공정한 선택 하나하나가 블랙 컴퍼니를 무너뜨렸어요!` },
     { who: 'me', pic: 'me', text: '작은 공정함이 모여 나라장터를 지킨다!' },
-    { who: 'narr', pic: 'badge', text: `🏅 칭호 획득: "나라장터 수호자"\n🔥 어려움 난이도가 열렸어요! 난이도를 고를 때 선택할 수 있어요.` },
+    { who: 'narr', pic: 'badge', text: `🏅 칭호 획득: "나라장터 수호자"\n🔥 어려움 난이도와 📗 시즌 2가 열렸어요! 플레이어 정보에서 고를 수 있어요.` },
   ];
   let i = 0, timer = null, full = '', typing = false;
   openModal(`
     <div style="display:flex;gap:18px;align-items:center;min-height:250px">
       <div id="st-pic" style="width:200px;height:200px;flex:none;display:flex;align-items:center;justify-content:center;background:#0b0d22;border:3px solid var(--gold);box-shadow:inset 0 0 0 2px #ffffff14"></div>
       <div style="flex:1;display:flex;flex-direction:column;gap:10px">
-        <div style="font-size:13px" class="gold">⭐ 진엔딩: 블랙 컴퍼니의 정체</div>
+        <div style="font-size:13px" class="gold">${season === 2 ? '⭐ 시즌 2 엔딩: 그림자 상사의 정체' : '⭐ 진엔딩: 블랙 컴퍼니의 정체'}</div>
         <div id="st-who" style="align-self:flex-start;padding:2px 10px;border:3px solid var(--line);font-size:14px"></div>
         <p id="st-text" style="font-size:18px;line-height:1.7;min-height:122px;white-space:pre-line" aria-live="polite"></p>
       </div>
@@ -1037,21 +1096,23 @@ function showTrueEnding() {
       <button class="btn" id="st-next">다음 ▶</button>
     </div>`);
   const unlock = () => {
-    try { if (localStorage.getItem('naraTitle') !== 'gold') localStorage.setItem('naraTitle', 'guardian'); localStorage.setItem('naraHard', '1'); } catch (e) {}
+    giveTitle(season === 2 ? 'detective' : 'guardian');
+    try { localStorage.setItem('naraHard', '1'); } catch (e) {}
     refreshStart();
   };
   const clueList = () => {
     clearInterval(timer); unlock();
-    openModal(`<h2>📜 모은 단서 5개</h2>
-      <p>${[...Array(5)].map((_, k) => '🧩 ' + CLUES[k + 1]).join('<br>')}</p>
-      <div class="tip" style="font-size:15px;line-height:1.6">${TRUE_ENDING}</div>
-      <p class="gold" style="text-align:center;font-size:18px">"작은 공정함이 모여 나라장터를 지킨다."</p>
-      <p style="text-align:center">${(myTitle() || TITLES.guardian).icon} 칭호: <b class="gold">${(myTitle() || TITLES.guardian).name}</b> · 🔥 <b>어려움 난이도</b>가 열렸어요!</p>
+    const CL = season === 2 ? CLUES2 : CLUES, t = myTitle() || TITLES.guardian;
+    openModal(`<h2>📜 ${season === 2 ? '📗 시즌 2 ' : ''}모은 단서 5개</h2>
+      <p>${[...Array(5)].map((_, k) => '🧩 ' + CL[k + 1]).join('<br>')}</p>
+      <div class="tip" style="font-size:15px;line-height:1.6">${season === 2 ? S2_ENDING : TRUE_ENDING}</div>
+      <p class="gold" style="text-align:center;font-size:18px">${season === 2 ? '"이름이 바뀌어도, 반칙은 반칙이다."' : '"작은 공정함이 모여 나라장터를 지킨다."'}</p>
+      <p style="text-align:center">${t.icon} 칭호: <b class="gold">${t.name}</b>${season === 2 ? ' · 📗 시즌 2 클리어!' : ' · 🔥 <b>어려움 난이도</b>와 📗 <b>시즌 2</b>가 열렸어요!'}</p>
       <div class="modal-acts"><button class="btn" onclick="closeModal()">닫기</button></div>`);
   };
   const show = () => {
     const sc = scenes[i];
-    const pic = $('st-pic'); pic.innerHTML = ''; pic.appendChild(tePic(sc.pic));
+    const pic = $('st-pic'); pic.innerHTML = ''; pic.appendChild(tePic(sc.pic, sc.icon));
     const who = $('st-who');
     if (sc.who === 'joa') { who.textContent = '🤖 조아 (AI 비서)'; who.style.background = 'var(--officer)'; who.style.color = 'var(--line)'; }
     else if (sc.who === 'me') { who.textContent = '🙂 ' + nm; who.style.background = 'var(--gold)'; who.style.color = 'var(--line)'; }
@@ -1091,11 +1152,11 @@ function honorific() {
 }
 /* 🐣 쉬움 모드: 어려운 낱말 뒤에 쉬운 뜻을 붙여요 (글마다 처음 나올 때 한 번만) */
 const GLOSS = { '덤핑': '너무 싸게 팔기', '담합': '몰래 짜고 가격 맞추기', '납기': '배달 속도', '낙찰': '계약 따냄', '유찰': '아무도 못 땀',
-  '개찰': '입찰서 열어 보기', '원가': '만드는 데 드는 돈', '예산': '쓸 수 있는 돈', '지체상금': '늦어서 내는 벌금', '부정청탁': '규칙을 어기게 하는 부탁' };
+  '개찰': '입찰서 열어 보기', '원가': '만드는 데 드는 돈', '예산': '쓸 수 있는 돈', '지체상금': '늦어서 내는 벌금', '부정청탁': '규칙을 어기게 하는 부탁', '수의계약': '경쟁 없이 바로 하는 계약' };
 function gloss(text) {
   if (!EASY) return text;
   const used = new Set();
-  return String(text).split(/(<[^>]*>)/).map(part => part.startsWith('<') ? part : part.replace(/덤핑|담합|납기|낙찰|유찰|개찰|원가|예산|지체상금|부정청탁/g, (w, i, all) => {
+  return String(text).split(/(<[^>]*>)/).map(part => part.startsWith('<') ? part : part.replace(/덤핑|담합|납기|낙찰|유찰|개찰|원가|예산|지체상금|부정청탁|수의계약/g, (w, i, all) => {
     if (used.has(w) || all[i + w.length] === '(') return w;
     used.add(w); return `${w}(${GLOSS[w]})`;
   })).join('');
@@ -1113,8 +1174,10 @@ function showProfile(mode, after) {
     <span id="nick-err" class="bad" style="font-size:12px;min-height:16px"></span>
     <div class="label">캐릭터</div>
     <div id="gender-row" style="display:flex;gap:12px"></div>
-    <div class="label">난이도</div>
-    <div id="level-row" style="display:flex;gap:10px"></div>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center">
+      <div class="label">난이도</div><div id="level-row" style="display:flex;gap:8px"></div>
+      <div class="label" id="season-label">시즌</div><div id="season-row" style="display:flex;gap:8px"></div>
+    </div>
     <div class="modal-acts">
       <button class="btn ghost" id="pf-cancel">취소</button>
       <button class="btn ${mode}" id="pf-ok">시작하기 →</button>
@@ -1145,10 +1208,19 @@ function showProfile(mode, after) {
     $('level-row').querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { level = b.dataset.lv; beep('click'); drawLevel(); });
   };
   drawLevel();
+  let season = PLAYER.season === 2 && hardUnlocked() ? 2 : 1;
+  const SEASONS = [[1, '📕 시즌 1', '블랙 컴퍼니를 막아라'], [2, '📗 시즌 2', hardUnlocked() ? '블랙 컴퍼니의 반격' : '🔒 진엔딩을 보면 열려요']];
+  const drawSeason = () => {
+    $('season-row').innerHTML = SEASONS.map(([k, n, d]) => `<button class="btn ${k === season ? '' : 'ghost'}" data-se="${k}" aria-pressed="${k === season}" ${k === 2 && !hardUnlocked() ? 'disabled' : ''} style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 14px">
+      <span style="font-size:15px">${n}</span><span style="font-size:11px">${d}</span></button>`).join('');
+    $('season-row').querySelectorAll('[data-se]').forEach(b => b.onclick = () => { season = Number(b.dataset.se); beep('click'); drawSeason(); });
+  };
+  drawSeason();
+  if (!hardUnlocked()) { $('season-label').style.display = 'none'; $('season-row').style.display = 'none'; }   // 진엔딩 전에는 시즌 고르기를 숨겨요 (화면이 덜 복잡하게)
   const ok = () => {
     const nick = input.value.trim();
     if (!nick) { $('nick-err').textContent = '닉네임을 입력해 주세요.'; input.focus(); return; }
-    PLAYER = { nick, gender, level };
+    PLAYER = { nick, gender, level, season };
     try { localStorage.setItem('naraPlayer', JSON.stringify(PLAYER)); } catch (e) {}
     closeModal(); after();
   };
@@ -1178,8 +1250,23 @@ const STORY = {      // 장면은 짧게! (엄마 피드백: 글이 많으면 �
     { who: 'joa', pic: 'ai', text: '저는 AI 비서 조아예요. 수상한 입찰서를 같이 찾아요!' },
   ],
 };
+/* 📗 시즌 2 오프닝 */
+const STORY_S2 = {
+  boss: [
+    { who: 'narr', pic: 'black', text: '블랙 컴퍼니가 무너지고 1년 뒤…' },
+    { who: 'narr', pic: 'rename', text: '블랙 컴퍼니가 "그림자 상사"로 이름만 바꿔서 돌아왔어요! 블랙 컴퍼니의 반격이 시작됐어요.' },
+    { who: 'joa', pic: 'ai', text: '{이름}, 이번엔 "계약을 쪼개 주겠다", "가짜 인증서를 팔겠다"는 유혹이 올 거예요. 흔들리지 말아요!' },
+    { who: 'me', pic: 'me', text: '이번에도 정직하게 이겨 보자!' },
+  ],
+  officer: [
+    { who: 'narr', pic: 'black', text: '블랙 컴퍼니가 무너지고 1년 뒤…' },
+    { who: 'narr', pic: 'rename', text: '블랙 컴퍼니가 "그림자 상사"로 이름만 바꿔서 돌아왔어요! 블랙 컴퍼니의 반격이 시작됐어요.' },
+    { who: 'joa', pic: 'ai', text: '새 반칙 3가지를 조심해요! ✂️ 계약 쪼개기, 💡 가짜 혁신제품, 🎭 이름만 바꾼 회사. 모두 📄서류에 증거가 있어요.' },
+    { who: 'me', pic: 'me', text: '이름을 바꿔도 다 찾아낼 거야!' },
+  ],
+};
 function playStory(mode, after) {
-  const scenes = STORY[mode];
+  const scenes = PLAYER.season === 2 && hardUnlocked() ? STORY_S2[mode] : STORY[mode];
   const slow = true;   // 컴퓨터의 '애니메이션 끄기' 설정과 상관없이 한 글자씩 나와요 (누르면 바로 다 보여요)
   let i = 0, timer = null, full = '', typing = false;
   openModal(`
@@ -1199,7 +1286,7 @@ function playStory(mode, after) {
   const show = () => {
     const sc = scenes[i];
     const pic = $('st-pic'); pic.innerHTML = '';
-    pic.appendChild(sc.pic === 'me' ? makeSprite(PLAYER.gender || 'boy', 13, modeTint(mode)) : makeSprite(sc.pic, sc.pic === 'ai' || sc.pic === 'coin' || sc.pic === 'black' ? 12 : 10, null, sc.pic === 'ai' ? JOA_COLORS[mode] : null));
+    pic.appendChild(sc.pic === 'rename' ? tePic('rename') : sc.pic === 'me' ? makeSprite(PLAYER.gender || 'boy', 13, modeTint(mode)) : makeSprite(sc.pic, sc.pic === 'ai' || sc.pic === 'coin' || sc.pic === 'black' ? 12 : 10, null, sc.pic === 'ai' ? JOA_COLORS[mode] : null));
     const who = $('st-who');
     if (sc.who === 'joa') { who.textContent = '🤖 조아 (AI 비서)'; who.style.background = mode === 'boss' ? 'var(--boss)' : 'var(--officer)'; who.style.color = 'var(--line)'; }
     else if (sc.who === 'me') { who.textContent = (mode === 'officer' ? '🏛️ ' : '🏢 ') + honorific(); who.style.background = modeTint(mode); who.style.color = 'var(--line)'; }
@@ -1238,7 +1325,8 @@ function paintPlayerTag(mode) {
   // 닉네임이 길면 "…"으로 줄이고, 🐣 쉬움 표시는 절대 두 줄로 안 쪼개지게 해요
   const tt = myTitle();
   el.insertAdjacentHTML('beforeend', `<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${mode === 'officer' ? '🏛️' : '🏢'} ${tt ? `<span title="${tt.name}">${tt.icon}</span> ` : ''}${esc(honorific())}</span>`
-    + (EASY || HARD ? `<span class="stat" style="font-size:11px;padding:1px 6px;white-space:nowrap;flex:none">${EASY ? '🐣 쉬움' : '🔥 어려움'}</span>` : ''));
+    + (EASY || HARD ? `<span class="stat" style="font-size:11px;padding:1px 6px;white-space:nowrap;flex:none">${EASY ? '🐣 쉬움' : '🔥 어려움'}</span>` : '')
+    + (S2 ? '<span class="stat" style="font-size:11px;padding:1px 6px;white-space:nowrap;flex:none">📗 시즌 2</span>' : ''));
 }
 
 /* =============================================================
@@ -1258,9 +1346,13 @@ function startMode(mode) {
 function beginMode(mode) {
   EASY = PLAYER.level === 'easy';                           // 🐣 쉬움 모드는 판을 만들기 전에 정해요 (숫자 표시가 달라져요)
   HARD = PLAYER.level === 'hard' && hardUnlocked();        // 🔥 어려움 (진엔딩을 본 사람만)
+  S2 = PLAYER.season === 2 && hardUnlocked();              // 📗 시즌 2 (진엔딩을 본 사람만)
+  COMPANIES.black.name = S2 ? '그림자 상사' : '블랙 컴퍼니';   // 📗 시즌 2: 블랙 컴퍼니가 이름을 바꿨어요
+  updateClueCount();
   if (mode === 'boss') BOSS_ROUNDS = buildBossRounds();   // 판마다 물건과 조건이 새로 뽑혀요
   if (mode === 'officer') OFFICER_ROUNDS = buildOfficerRounds();
-  const temptPlan = mode === 'officer' ? shuffle(Object.keys(TEMPTS)).slice(0, 2) : [];   // 2·3라운드에 유혹 이벤트
+  const basicTempts = Object.keys(TEMPTS).filter(k => k !== 'splitAsk');
+  const temptPlan = mode !== 'officer' ? [] : S2 ? shuffle(['splitAsk', pick(basicTempts)]) : shuffle(basicTempts).slice(0, 2);   // 2·3라운드에 유혹 이벤트 (📗 시즌 2는 계약 쪼개기 부탁이 꼭 나와요)
   if (G && G.timerId) clearInterval(G.timerId);
   G = { mode, round: 0, money: 10000000, saved: 0, honesty: 0, boughtCheap: false, colluded: false, docsFixed: false, picked: [], hand: [], reported: new Set(), analyzed: false, analyzeLeft: 3, upgrades: [], invested: 0, judges: [], wrongReports: 0, timerId: null, log: [], lens: 3, evidence: new Map(), evReports: 0, tempts: {}, temptWon: 0, temptTotal: 0 };   // analyzeLeft: 조아 분석 기회 (게임 전체)
   G.easy = EASY;
@@ -1353,7 +1445,10 @@ function reqBox(R) {
     : `📊 나라장터 실제 가격<br><b>${unitPrice(R.min)} ~ ${unitPrice(R.max)}</b> <span class="muted">(1${R.unit}당)</span>`;
   return `<div class="label">📋 요청서</div><h3>${R.item}</h3>
     <p>요청 기관: ${R.who}</p><p>수량: <b class="gold">${R.qty.toLocaleString()}${R.unit}</b>${R.w && !R.emergency ? ` · 예산 1${R.unit}당 <b class="${R.budget < R.max ? 'bad' : 'gold'}">${unitPrice(R.budget || R.max)}</b>까지` : ''}</p>${R.cond ? `<div style="margin-top:5px;padding:3px 8px;background:#e5484d33;border:2px solid var(--bad);font-size:13px">⚠️ 특별 조건: <b>${CONDS[R.cond].label}</b></div>` : ''}
-    <div class="price-real">${range}</div>${R.w ? criteriaHTML(R.w) : ''}`;
+    <div class="price-real">${range}</div>${R.banned ? bannedHTML(R) : ''}${R.w ? criteriaHTML(R.w) : ''}`;
+}
+function bannedHTML(R) {                        // 📗 시즌 2: 반칙해서 입찰이 금지된 대표 명단
+  return `<div style="margin-top:5px;padding:3px 8px;background:#00000040;border:2px dashed var(--bad);font-size:12px">⛔ 입찰 제한 대표: <b>${R.banned.join(', ')}</b></div>`;
 }
 /* 심사 기준 표시: 가중치를 ●●● 로 보여줘요 */
 const CRITERIA = [['price', '💸 가격'], ['quality', '🔧 품질'], ['speed', '🚚 납기'], ['eco', '🌿 친환경'], ['track', '📈 실적'], ['innov', '💡 혁신제품']];
@@ -1443,7 +1538,7 @@ function myBid() { return bidWith(G.picked, G.bidPrice); }
 function bidWith(cards, price) {                 // "이 카드, 이 가격이었다면?" 계산용
   const R = BOSS_ROUNDS[G.round];
   const b = { price, quality: 3, speed: 3, eco: 0, track: 0, innov: 0, costMul: 1, honesty: 0, tempt: false };
-  if (G.docsFixed) b.quality += 2;
+  if (G.docsFixed) { if (G.fakeInv) { b.innov = 1; b.quality += 1; } else b.quality += 2; }   // 📗 시즌 2는 가짜 혁신제품 인증서
   (G.upgrades || []).forEach(u => UPGRADES[u].apply(b));   // 🏭 투자한 시설은 항상 효과가 있어요
   cards.forEach(k => CARDS[k].apply(b));
   b.price = price;
@@ -1561,6 +1656,22 @@ function pickCard(k) {
   renderBoss();
 }
 function bossCollude() {
+  if (S2) {                                     // 📗 시즌 2: 그림자 상사의 계약 쪼개기 제안
+    openModal(`<h2>🕶️ 그림자 상사의 제안</h2>
+      <p class="tip">"아는 담당자가 이번 ${BOSS_ROUNDS[G.round].item} 계약을 작게 쪼개서, 경쟁 없이 너희랑만 계약해 준대. 다른 회사들은 몰라. 대신 우리랑 손잡는 거야."</p>
+      <p>🤖 조아: 이건 <b class="bad">계약 쪼개기</b>예요. 경쟁을 피하려고 계약을 나누면 더 좋은 회사가 뽑힐 기회가 사라지고, 세금이 낭비돼요.</p>
+      <div class="modal-acts">
+        <button class="btn red" id="c-yes">😈 제안 받아들이기</button>
+        <button class="btn green" id="c-no">🙅 거절하기</button>
+      </div>`);
+    $('c-yes').onclick = () => { G.colluded = true; G.honesty -= 3; closeModal(); joaSay('b', '…{이름}, 경쟁 회사들이 제대로 경쟁하지 못하게 됐어요. 정말 괜찮을까요?'); renderBoss(); };
+    $('c-no').onclick = () => {
+      G.honesty += 1; G.bossExtraRivals = ['black'];
+      openModal(`<h2>🙅 거절했어요!</h2><p>그림자 상사가 화가 나서 이번 입찰에 직접 뛰어들었어요. 더 어려워졌지만, 정직한 선택이에요.</p>
+        ${addClue(4)}<div class="modal-acts"><button class="btn" onclick="closeModal();renderBoss()">계속하기</button></div>`);
+    };
+    return;
+  }
   openModal(`<h2>🕶️ 블랙 컴퍼니의 쪽지</h2>
     <p class="tip">"이번 ${BOSS_ROUNDS[G.round].item} 입찰, 우리끼리 가격을 맞추자. 다른 회사들도 다 비싸게 낼 거야. 너만 따라오면 낙찰은 보장해 주지."</p>
     <p>🤖 조아: 이건 <b class="bad">담합</b>이에요. 회사들이 몰래 가격을 맞추면 경쟁이 사라지고, 결국 세금이 낭비돼요.</p>
@@ -1576,6 +1687,18 @@ function bossCollude() {
   };
 }
 function bossDocs() {
+  if (S2) {                                     // 📗 시즌 2: 가짜 혁신제품 인증서 유혹
+    openModal(`<h2>💡 가짜 인증서 장사꾼</h2>
+      <p>우리 ${BOSS_ROUNDS[G.round].item} 제품이 혁신제품 기준에 <b class="bad">조금 못 미쳐요.</b> 그때 그림자 상사 직원이 찾아왔어요.</p>
+      <p class="tip">"{이름}, 혁신제품 인증서 하나 만들어 줄게요. 번호도 그럴듯하게! 아무도 확인 안 해요."</p>
+      <div class="modal-acts">
+        <button class="btn red" id="d-fix">📜 가짜 인증서 사기 (점수 UP, 들킬 수도…)</button>
+        <button class="btn green" id="d-honest">🔬 제대로 연구하기 (원가 +10%)</button>
+      </div>`);
+    $('d-fix').onclick = () => { G.docsFixed = true; G.fakeInv = true; G.honesty -= 3; closeModal(); renderBoss(); };
+    $('d-honest').onclick = () => { G.docsHonest = true; G.honesty += 1; closeModal(); renderBoss(); };
+    return;
+  }
   openModal(`<h2>📄 품질 검사 결과</h2>
     <p>${BOSS_ROUNDS[G.round].item} 장비 일부가 품질 기준에 <b class="bad">조금 못 미쳐요.</b> 직원이 조용히 말해요.</p>
     <p class="tip">"{이름}, 서류 숫자만 살짝 고치면 아무도 몰라요. 품질 점수도 올라가고요."</p>
@@ -2178,13 +2301,13 @@ function bossSubmit() {
     <p class="muted" style="font-size:12px">💡 같은 카드를 써도 회사마다 <b>원래 실력</b>(품질·납기·가격)이 달라서 점수가 달라요.</p>`;
 
   let joa;
-  if (caught) joa = '🚨 서류 조작이 들통났어요! 계약이 취소되고 벌금 3,000만원을 냈어요.';
+  if (caught) joa = G.fakeInv ? '🚨 가짜 혁신제품 인증서가 들통났어요! 지정 번호를 조회하니 없는 번호였어요. 계약이 취소되고 벌금 3,000만원을 냈어요.' : '🚨 서류 조작이 들통났어요! 계약이 취소되고 벌금 3,000만원을 냈어요.';
   else if (R.emergency) joa = me.tempt ? '…피해 주민들이 비싼 값을 냈어요. 이익은 늘었지만 마음이 무거워요.' : '👍 정직한 가격으로 구호물품을 보냈어요. 주민들이 고마워해요!';
   else if (win) joa = me.profit < 0 ? '낙찰은 됐지만 너무 싸게 팔아서 손해를 봤어요. 싸다고 다 좋은 게 아니에요!' : `🎉 {이름}, 낙찰! 이번 심사 기준(${topCriteria(R.w)})에 잘 맞췄어요.`;
-  else joa = (rows.some(r => r.k === 'black' && r.dumping) ? '블랙 컴퍼니는 덤핑 의심으로 감점됐지만, ' : '')
+  else joa = (rows.some(r => r.k === 'black' && r.dumping) ? `${COMPANIES.black.name}${josa(COMPANIES.black.name, '은', '는').slice(COMPANIES.black.name.length)} 덤핑 의심으로 감점됐지만, ` : '')
     + `{이름}, 아쉽게 떨어졌어요. 아래 이유를 보고 다음 라운드에 다시 도전해 봐요!`;
 
-  if (R.emergency && !me.tempt) extra += addClue(4);
+  if (R.emergency && !me.tempt) extra += addClue(S2 ? 3 : 4);
   const showResult = () => {
   if (caught || (win && R.emergency && me.tempt)) shakeAlert(); else beep(win ? 'win' : 'lose');
 
@@ -2238,10 +2361,14 @@ const FLAG_INFO = {   // 수상한 입찰서 설명 (결과 화면에서 "이렇
   fake:    { name: '📄 서류 위조',  why: '생긴 지 몇 달 안 된 회사(2050년)인데 납품 실적이 너무 많아요. 말이 안 돼요!', how: '📄서류의 설립일과 실적을 같이 보세요.' },
   friend:  { name: '🤝 친구 부탁',  why: '친구 회사라도 실제 가격보다 훨씬 비싸요. 봐주면 세금이 새요.', how: '친구여도 똑같은 기준으로 비교해야 해요.' },
   black:   { name: '🕶️ 블랙 컴퍼니', why: '대표자 칸이 비어 있고, 주소가 확인되지 않아요. 가짜 회사예요.', how: '📄서류의 대표자와 주소를 보세요.' },
+  split:   { name: '✂️ 계약 쪼개기', why: '경쟁을 피하려고 한 계약을 일부러 나눠서, 경쟁 없이 계약(수의계약)해 달래요. 규칙 위반이에요.', how: '📄서류의 "계약 방법"을 확인하세요.' },
+  fakeinv: { name: '💡 가짜 혁신제품', why: '혁신제품 지정 기간이 이미 끝났는데, 아직 혁신제품인 것처럼 냈어요.', how: '📄서류 인증의 날짜를 오늘(2050년 10월)과 비교하세요.' },
+  rename:  { name: '🎭 이름만 바꾼 회사', why: '입찰이 금지된 대표가 회사 이름만 바꿔서 다시 들어왔어요.', how: '📄서류의 대표자를 요청서의 ⛔입찰 제한 명단과 비교하세요.' },
   over:    { name: '⛔ 예산 초과',  why: '예산보다 비싸서 계약할 수 없어요.', how: '' },
   unqual:  { name: '⚠️ 조건 미달',  why: '기관의 특별 조건을 못 지켜요.', how: '' },
 };
 const FLAG_CLUE = { low: 1, collude: 2, black: 5 };
+const FLAG_CLUE_S2 = { split: 1, fakeinv: 2, rename: 5 };   // 📗 시즌 2 단서
 function stopTimer() { if (G && G.timerId) { clearInterval(G.timerId); G.timerId = null; } if ($('o-timer-box')) $('o-timer-box').hidden = true; }
 function officerRound() {
   const R = OFFICER_ROUNDS[G.round];
@@ -2278,6 +2405,7 @@ function startTimer() {                          // ⏱️ 긴급 라운드: 30�
 }
 function bidInfo(bd) {
   const c = COMPANIES[bd.co];
+  if (bd.alias) return { ...bd, name: bd.alias.name, emoji: bd.alias.emoji, tint: '#6d6a8a' };   // 🎭 이름만 바꾼 회사
   return { ...bd, name: c.name, emoji: c.emoji, tint: c.tint };
 }
 function renderOfficer() {
@@ -2334,6 +2462,13 @@ function evidenceFor(i, field) {        // 이 칸이 반칙의 증거면 이유
       if (field === 'ceo')   return '대표가 내 친구예요! 친구라고 봐주면 공정하지 않아요.';
       if (field === 'price') return `실제 최고가(${unitPrice(R.max)})보다 훨씬 비싸요!`;
       return null;
+    case 'split':
+      return field === 'way' ? '일부러 나눠서 경쟁 없이 계약하려 해요! 계약 쪼개기예요.' : null;
+    case 'fakeinv':
+      return field === 'certs' ? `혁신제품 지정이 ${bd.until}에 끝났어요! 오늘은 2050년 10월이라 이미 기간이 지난 인증이에요.` : null;
+    case 'rename':
+      if (field === 'ceo') return `대표 ${d.ceo}${josa(d.ceo, '은', '는').slice(d.ceo.length)} ⛔입찰 제한 명단에 있어요! 회사 이름만 바꿔서 다시 들어왔어요.`;
+      return null;
     case 'black':
       if (field === 'ceo')   return d.ceo ? null : '대표자 칸이 텅 비어 있어요! 누가 운영하는지 모르는 회사예요.';
       if (field === 'addr' || field === 'tel') return '주소와 연락처를 확인할 수 없어요. 유령 회사 같아요!';
@@ -2365,6 +2500,7 @@ function officerDocs(i, justChecked) {
     ['addr', '회사 주소', d.addr],
     ['tel', '연락처', `<span class="num">${d.tel}</span>`],
     ['records', '납품 실적', d.records + '건'],
+    ...(S2 ? [['way', '계약 방법', esc(d.way || '한 번에 계약 (경쟁 입찰)')]] : []),
     ['certs', '인증', d.certs.length ? d.certs.join('<br>') : '없음'],
     ['price', '입찰 가격', `<span class="num">1${R.unit}당 ${unitPrice(b.price)} (총 ${won(b.price * R.qty)})</span>`],
   ];
@@ -2377,7 +2513,7 @@ function officerDocs(i, justChecked) {
   };
   const found = G.evidence.has(i) && !G.reported.has(i);
   openModal(`<div id="doc-view"></div><h2>📄 ${b.emoji} ${b.name} 제출 서류</h2>
-    <p class="muted" style="font-size:12px;margin:0 0 6px">📅 오늘: 2050년 10월 · ${G.lens > 0
+    <p class="muted" style="font-size:12px;margin:0 0 6px">📅 오늘: 2050년 10월${R.banned ? ` · ⛔ 입찰 제한 대표: <b class="bad">${R.banned.join(', ')}</b>` : ''} · ${G.lens > 0
       ? `수상한 칸을 <b class="gold">눌러서 🔍돋보기</b>로 확인해요! (남은 돋보기 <b class="gold">${G.lens}</b>개 · 이상 없는 칸을 눌러도 1개 써요)`
       : '<b class="bad">이번 라운드 돋보기를 다 썼어요.</b> 눈으로 잘 살펴보세요!'}</p>
     <table class="tbl doc-tbl" style="text-align:left;font-size:14px">${rows.map(tr).join('')}</table>
@@ -2412,7 +2548,7 @@ function officerReport(i) {
   openModal(`<h2>🚨 신고 성공! ${fi.name}</h2>
     ${withEv ? `<p class="tip">🔍 <b class="gold">증거와 함께 신고했어요! (판단 점수 +5)</b><br>${G.evidence.get(group.find(j => G.evidence.has(j)))}</p>`
              : '<p class="muted" style="font-size:13px">💡 다음엔 📄서류에서 🔍증거를 찾고 신고하면 보너스 점수(+5)를 받아요!</p>'}
-    <p>🤖 조아: ${fi.why}</p>${addClue(FLAG_CLUE[bd.flag])}
+    <p>🤖 조아: ${fi.why}</p>${addClue((S2 ? FLAG_CLUE_S2 : FLAG_CLUE)[bd.flag])}
     <div class="modal-acts"><button class="btn" onclick="closeModal();renderOfficer()">계속하기</button></div>`);
 }
 /* 🎁 유혹 이벤트: 라운드 중간에 갑자기 찾아와요. 고른 선택이 정직 점수와 엔딩에 반영돼요 */
@@ -2434,6 +2570,10 @@ const TEMPTS = {
     good: { label: '🙏 정중하게 거절하기', msg: '잘했어요! 심사 중에는 업체와 따로 만나지 않는 게 안전해요.' },
     fact: '입찰 중인 회사가 사 주는 밥도 <b>접대</b>가 될 수 있어요. 공정해 보이는 것도 중요해서 피하는 게 원칙이에요.' },
 };
+TEMPTS.splitAsk = { art: '✂️', title: '계약 쪼개기 부탁', text: co => `과장님이 말해요. "이번 계약을 3개로 쪼개면 경쟁 입찰 없이 <b>${co}</b>${josa(co, '과', '와').slice(co.length)} 바로 계약할 수 있어. 빨리 끝내자고."`,
+  bad:  { label: '✂️ 쪼개서 바로 계약하기', msg: '경쟁 없이 계약해 버렸어요… 더 좋은 회사를 고를 기회가 사라졌어요.', forced: true },
+  good: { label: '🙅 "경쟁 입찰로 할게요" 말하기', msg: '정답이에요! 경쟁을 피하려고 계약을 일부러 쪼개면 안 돼요.' },
+  fact: '작은 계약은 경쟁 없이 바로 계약(<b>수의계약</b>)할 수 있어요. 그래서 이 기준을 피하려고 계약을 일부러 쪼개는 건 금지돼 있어요. 2018년 경기도 감사에서는 관광안내책자 계약을 쪼개 수의계약한 일이 적발돼, 담당 직원들을 고발하라는 결정이 나왔어요.' };
 function showTempt(id, after) {
   const T = TEMPTS[id], R = OFFICER_ROUNDS[G.round];
   const ok = R.bids.map((b, j) => j).filter(j => !bidProblem(R.bids[j], R));
@@ -2481,6 +2621,14 @@ function officerFriend(after) {
 }
 function officerBlack() {
   const R = OFFICER_ROUNDS[G.round];
+  if (S2) {
+    openModal(`<h2>🕶️ 그림자 상사가 숨어 있어요!</h2>
+      <p>소문에 따르면, 블랙 컴퍼니가 <b class="gold">이름만 바꿔서</b> 이번 입찰에 몰래 들어왔대요.</p>
+      <p class="tip">🤖 조아: "요청서의 <b>⛔ 입찰 제한 대표</b> 명단과 📄서류의 <b>대표자</b>를 비교해 보세요!"</p>
+      <div class="modal-acts"><button class="btn" id="bk-ok">알겠어요</button></div>`);
+    $('bk-ok').onclick = () => { closeModal(); joaSay('o', '이름이 바뀌어도 대표는 그대로예요. 📄서류의 대표자를 확인해 봐요!'); };
+    return;
+  }
   const bi = R.bids.findIndex(b => b.flag === 'black');
   openModal(`<h2>🕶️ 블랙 컴퍼니의 최종 입찰</h2>
     <p>블랙 컴퍼니가 <b class="gold">엄청나게 싼</b> 가격에 품질·납기·인증까지 모두 최고라고 써서 냈어요.</p>
@@ -2683,7 +2831,8 @@ function finish() {
   const key = (rich ? 'rich' : 'poor') + (honest ? 'Honest' : 'Dishon');
   const gotGold = HARD && rich && honest && (myTitle() || {}).name !== TITLES.gold.name;   // 🔥어려움을 좋은 엔딩으로 깨면 👑 황금 수호자
   if (HARD && rich && honest) { try { localStorage.setItem('naraTitle', 'gold'); } catch (e) {} }
-  const E = ENDINGS[m][key];
+  const CS = S2 ? clues2 : clues;                   // 지금 시즌의 단서
+  const E0 = ENDINGS[m][key], E = S2 ? { ...E0, text: E0.text.split('블랙 컴퍼니').join('그림자 상사') } : E0;
   $('res-mode').textContent = (m === 'boss' ? '🏢 ' : '🏛️ ') + honorific() + '의 엔딩';
   $('res-name').textContent = E.name;
   $('res-text').textContent = E.text;
@@ -2695,11 +2844,12 @@ function finish() {
     ${m === 'officer' && G.temptTotal ? `<span class="stat">🛡️ 유혹 이겨냄 <b>${G.temptWon}/${G.temptTotal}</b></span>` : ''}
     <span class="stat">정직 점수 <b>${honest ? '⚖️ 높음' : '⚠️ 낮음'}</b></span>
     ${m === 'boss' ? `<span class="stat">🏭 시설 <b>${(G.upgrades || []).map(u => UPGRADES[u].icon).join('') || '없음'}</b></span>` : ''}
-    <span class="stat">🧩 단서 <b>${clues.size}/5</b></span>`;
-  $('res-tip').innerHTML = clues.size >= 5
-    ? '⭐ 단서를 모두 모았어요! 블랙 컴퍼니의 정체를 확인해 보세요.'
-    : `💡 단서 ${5 - clues.size}개가 더 필요해요. ${m === 'boss' ? '담당자 모드도 해보세요!' : '사장님 모드도 해보세요!'} 정직한 선택을 하면 단서를 얻을 수 있어요.`;
-  $('res-true').hidden = clues.size < 5;
+    <span class="stat">🧩 ${S2 ? '시즌 2 ' : ''}단서 <b>${CS.size}/5</b></span>`;
+  $('res-tip').innerHTML = CS.size >= 5
+    ? (S2 ? '⭐ 시즌 2 단서를 모두 모았어요! 그림자 상사의 정체를 확인해 보세요.' : '⭐ 단서를 모두 모았어요! 블랙 컴퍼니의 정체를 확인해 보세요.')
+    : `💡 ${S2 ? '시즌 2 ' : ''}단서 ${5 - CS.size}개가 더 필요해요. ${m === 'boss' ? '담당자 모드도 해보세요!' : '사장님 모드도 해보세요!'} 정직한 선택을 하면 단서를 얻을 수 있어요.`;
+  $('res-true').hidden = (S2 ? clues2 : clues).size < 5;
+  $('res-true').textContent = S2 ? '⭐ 시즌 2 엔딩 보기' : '⭐ 진엔딩 보기';
   if (gotGold) $('res-tip').innerHTML = '👑 <b class="gold">칭호 획득: 황금 수호자!</b> 🔥 어려움 난이도를 좋은 엔딩으로 깼어요. 진짜 나라장터 고수예요!';
   $('res-retry').onclick = () => beginMode(m);
   showScreen('result');
