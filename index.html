@@ -295,7 +295,7 @@
       <button class="btn sm ghost" id="start-true2" onclick="showTrueEnding(2)" hidden>⭐ 시즌 2 엔딩</button>
       <button class="btn sm ghost" onclick="resetRecord()">기록 초기화</button>
     </div>
-    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v6.1</b></span>
+    <span class="muted" style="font-size:11px">가격 출처: 2026년 10월 나라장터 종합쇼핑몰 (게임용으로 단순화) · <b>버전 v6.2</b></span>
   </section>
 
   <!-- ===================== 사장님 모드 ===================== -->
@@ -2798,10 +2798,10 @@ function officerPick(i, forcedFriend) {
   const judgeHow = !bad
     ? `내가 고른 곳 ${me.val}점 ÷ 1등 ${best.val}점 × 100${caughtAll ? ' + 신고 보너스 10' : ''}${G.evReports ? ` + 증거 보너스 ${5 * G.evReports}` : ''}${G.wrongReports ? ` − 억울한 신고 ${G.wrongReports * 15}` : ''} = ${judge}점${judge === 100 ? ' (최대 100점)' : ''}`
     : '문제 있는 회사와 계약해서 점수가 낮아요.';
-  const missed = suspects.filter(x => !G.reported.has(x.j) && x.j !== i);
+  const missed = suspects.filter(x => !G.reported.has(x.j));   // 내가 계약한 수상한 회사도 '놓친 반칙'에 들어가요
   const susLine = missed.length
     ? `🕵️ 놓친 반칙: ${[...new Map(missed.map(x => [x.flag, x])).values()].map(x => `${x.emoji} ${x.name} <b class="bad">${FLAG_INFO[x.flag].name}</b>`).join(', ')}`
-    : suspects.length ? '🕵️ 수상한 회사를 <b class="good">모두 신고</b>했어요! (+10점)' : '🕵️ 이번엔 수상한 회사가 <b>없었어요.</b>';
+    : suspects.length ? `🕵️ 수상한 회사를 <b class="good">모두 신고</b>했어요!${bad ? '' : ' (+10점)'}` : '🕵️ 이번엔 수상한 회사가 <b>없었어요.</b>';
   const chip = (t, cls) => `<span class="stat" style="font-size:13px">${t}</span>`;
 
   openModal(`<h2>${bad ? '😰 아쉬운 계약' : best.j === i ? '🏅 최고의 계약!' : '✅ 계약 완료!'}</h2>
